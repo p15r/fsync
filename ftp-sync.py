@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import argparse
 from ftplib import FTP
 from pathlib import Path
@@ -39,12 +38,12 @@ def _login(target: str) -> FTP:
     return ftp
 
 
-def _list_remote(ftp: FTP, cwd=None, files=None) -> List[str]:
-    # TODO: use default values instead of `if not files`
+def _path_encode(p):
+    from urllib.request import pathname2url
+    return pathname2url(p)
 
-    if not files:
-        files = {}
 
+def _list_remote(ftp: FTP, cwd=None, files={}) -> List[str]:
     if not cwd:
         cwd = REMOTE_MUSIC_LIB_ROOT_DIR
         files[cwd] = {}
@@ -55,7 +54,7 @@ def _list_remote(ftp: FTP, cwd=None, files=None) -> List[str]:
     f = []      # files in current dir
     for name, meta in ftp.mlsd(path=cwd):
         if meta['type'] == 'file':
-            f.append(name)
+            f.append(_path_encode(name))
 
         if meta['type'] == 'dir':
             dr.append(name)
@@ -82,36 +81,74 @@ def _list_local(music_lib: Path) -> List[str]:
     for p in music_lib.rglob('*'):
         # TODO: instead of string casting, use p.resolve().as_uri() &
         #       parse target files also into URLs
-        files.append(str(p.resolve()))
+        absolute_path = p.resolve()
+        relative_path = absolute_path.relative_to(music_lib)
+        files.append(_path_encode(str(relative_path)))
 
     return files
 
 
-def _to_list(lib, path=None, local_list=None, final_lib=None) -> List[str]:
-    # TODO: use default values instead of `if not local_list`
+def _to_list(lib, path='', final_lib=[]) -> List[str]:
+    local_list = []
 
-    if not final_lib:
-        final_lib = []
-
-    if not local_list:
-        local_list = []
-
-    if not path:
+    # TODO: made default param
+    if path == REMOTE_MUSIC_LIB_ROOT_DIR:
+        # for music lib comparison, paths must be from lib root
         path = ''
 
+    #breakpoint()
     for k, v in lib.items():
         if k != 'files':
-            path = f'{path}/{k}'
+            # TODO: doc why k != 'files'
+            if len(path) == 0:
+                path = k
+            else:
+                path = f'{path}/{k}'
+
+        # TODO: this is true if 'files':[] in root is iterated,
+        #       if I do not jump over it, the recursion stop. why?
+        if k == 'files' and len(v) == 0: continue
 
         if isinstance(v, list):
             for item in v:
                 local_list.append(f'{path}/{item}')
-                return local_list
+            return local_list
 
         if isinstance(v, dict):
-            final_lib.extend(_to_list(v, path, local_list, final_lib))
+            final_lib.extend(_to_list(v, path, final_lib))
+
+            # we've done a directory, go back one directory
+            path = str(Path(path).parent)
+            if path == '.':
+                path = ''
 
     return final_lib
+
+
+def _calculate_delta(local_lib, target_lib):
+    to_add = set(local_lib) - set(target_lib)
+    to_delete = set(target_lib) - set(local_lib)
+
+    ## <remove folders>
+    remove = set()
+    for item in to_add:
+        child = item.split('/')[-1]
+        if len(child.split('.')) == 1:
+            # TODO:
+            # if a folder has a dot in it, it would not be removed and
+            # thus synced to the target (solved when using Path instead of 
+            # strings; then we do not even add dirs to the lib.
+            remove.add(item)
+
+    for item in remove:
+        to_add.remove(item)
+    ## </remove folders>
+
+    print('### Tracks to sync:')
+    [print(f'- {x}') for x in sorted(to_add)]
+
+    print('\n### Tracks to delete:')
+    [print(f'- {x}') for x in sorted(to_delete)]
 
 
 def main() -> int:
@@ -121,18 +158,20 @@ def main() -> int:
     # ftp = _login(target)
 
     # print('List remote music library...')
-    # current_target_library = _list_remote(ftp)
+    # target_lib = _list_remote(ftp)
 
-    current_local_library = _list_local(Path(source_lib))
+    local_lib = _list_local(Path(source_lib))
 
     with open('mock_remote_lib.json', 'r') as f:
         import json
-        current_target_library = json.load(f)
+        target_lib = json.load(f)
 
-    current_target_library = _to_list(current_target_library)
+    # it wants to delete:
+    # - pop/07/Phil The Beat x ILIRA %e2%80%93 Anytime (Official Lyric Video)-u8qZzGkvD6g.mp4.mp3 - but it's on local. 
+    # added path name encoding - regenerate remote mock and test.
+    target_lib = _to_list(target_lib)
 
-    missing_on_target = set(current_local_library) - set(current_target_library)
-    delete_on_target = set(current_target_library) - set(current_local_library)
+    _calculate_delta(local_lib, target_lib)
 
     breakpoint()
 
