@@ -150,15 +150,17 @@ def _calculate_delta(local_lib, target_lib):
     print('\n### Tracks to delete:')
     [print(f'- {x}') for x in sorted(to_delete)]
 
+    return to_add, to_delete
+
 
 def main() -> int:
     source_lib, target = _usage()
 
-    # print('Authenticating...')
-    # ftp = _login(target)
+    #print('Authenticating...')
+    #ftp = _login(target)
 
-    # print('List remote music library...')
-    # target_lib = _list_remote(ftp)
+    #print('List remote music library...')
+    #target_lib = _list_remote(ftp)
 
     local_lib = _list_local(Path(source_lib))
 
@@ -166,12 +168,9 @@ def main() -> int:
         import json
         target_lib = json.load(f)
 
-    # it wants to delete:
-    # - pop/07/Phil The Beat x ILIRA %e2%80%93 Anytime (Official Lyric Video)-u8qZzGkvD6g.mp4.mp3 - but it's on local. 
-    # added path name encoding - regenerate remote mock and test.
     target_lib = _to_list(target_lib)
 
-    _calculate_delta(local_lib, target_lib)
+    add, remove = _calculate_delta(local_lib, target_lib)
 
     breakpoint()
 
