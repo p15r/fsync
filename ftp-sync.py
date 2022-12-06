@@ -168,13 +168,13 @@ def _calculate_delta(local_lib, target_lib):
     if len(to_add) == 0:
         logging.info('! Nothing to sync')
     else:
-        [logging.info(f'+ {x}') for x in to_add]
+        [logging.info(f'+ {UL.url2pathname(x)}') for x in to_add]
 
     logging.info('Tracks to remove:')
     if len(to_delete) == 0:
         logging.info('! Nothing to remove')
     else:
-        [logging.info(f'- {x}') for x in to_delete]
+        [logging.info(f'- {UL.url2pathname(x)}') for x in to_delete]
         input('Continue and remove files?')
 
     return to_add, to_delete
@@ -280,7 +280,6 @@ def main() -> int:
 
     if not empty_target:
         target_lib = _to_list(target_lib)
-        logging.debug('_to_list() ended')
 
     add, remove = _calculate_delta(local_lib, target_lib)
 
