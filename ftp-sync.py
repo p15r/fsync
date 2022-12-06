@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import argparse
+import logging
+import os
 import urllib.request as UL
 from datetime import datetime
 from ftplib import FTP
 from pathlib import Path
 from typing import List
-import logging
-import os
 
 
 # NO TRAILING SLASH
@@ -108,6 +108,7 @@ def _to_list(lib, path='', final_lib=[]) -> List[str]:
         # for music lib comparison, paths must be from lib root
         path = ''
 
+    # TODO: cleanup: is `path` and `v` always the same?
     for k, v in lib.items():
         if k != 'files':
             # TODO: doc why k != 'files'
@@ -125,14 +126,13 @@ def _to_list(lib, path='', final_lib=[]) -> List[str]:
 
         # TODO: this is true if 'files':[] in root is iterated,
         #       if I do not jump over it, the recursion stop. why?
-        if k == 'files' and len(v) == 0: 
+        if k == 'files' and len(v) == 0:
             continue
 
-        #breakpoint()
         if isinstance(v, list):
             for item in v:
                 local_list.append(f'{path}/{item}')
-            return local_list
+            final_lib.extend(local_list)
 
         if isinstance(v, dict):
             final_lib.extend(_to_list(v, path, final_lib))
@@ -190,7 +190,7 @@ def _sync_delete(ftp, lib):
     #       a folder has been removed, thus I need to iterate over all
     #       folders, check if they are empty, then delete them
 
-    lib = sorted(lib, reverse=True)
+    lib = sorted(lib, key=lambda s: len(s), reverse=True)
 
     for item in lib:
         logging.info(f'Removing {item}...')
@@ -259,7 +259,7 @@ def main() -> int:
     start_sync = datetime.now()
 
     local_lib = _list_local(Path(source_lib))
-    
+
     if len(local_lib) == 0:
         input('Local library is empty. Delete everything on target?')
 
