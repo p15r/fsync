@@ -40,8 +40,10 @@ def _usage() -> str:
 
 def _login(target: str) -> FTP:
     ftp = FTP(target)
+    ftp.encoding='utf-8'
     ftp.set_debuglevel(0)
     ftp.login()
+    ftp.sendcmd('OPTS UTF8 ON')
 
     welcome = ftp.getwelcome()
 
@@ -52,6 +54,7 @@ def _login(target: str) -> FTP:
 
 
 def _path_encode(p):
+    p = p.encode('utf-8')
     return UL.pathname2url(p)
 
 
@@ -245,6 +248,7 @@ def _sync_add(ftp, source_lib, lib):
         with open(path, 'rb') as f_handle:
             logging.info(f'Uploading {item}...')
             # cwd?
+            logging.debug(f'Uploading file "{item}"')
             ftp.storbinary(
                 f'STOR {REMOTE_MUSIC_LIB_ROOT_DIR}/{item}',
                 f_handle
