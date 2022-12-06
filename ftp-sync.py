@@ -100,57 +100,45 @@ def _list_local(music_lib: Path) -> List[str]:
     return files
 
 
-def _to_list(lib, path='', final_lib=[]) -> List[str]:
+def _to_list(lib, path='') -> List[str]:
     local_list = []
 
-    # TODO: made default param
     if path == REMOTE_MUSIC_LIB_ROOT_DIR:
-        # for music lib comparison, paths must be from lib root
         path = ''
 
-    # TODO: cleanup: is `path` and `v` always the same?
     for k, v in lib.items():
         if k != 'files':
-            # TODO: doc why k != 'files'
-            if len(path) == 0:
+            if not path:
                 path = k
             else:
                 path = f'{path}/{k}'
 
-        # do I need this?
-        # last dir in path (e.g. lib/pop/01/)
- #       if len(lib) == 1 and len(v) == 0:
- #           # only 'files' key left, empty
- #           # add empty dir
- #           return [path]
-
-        # TODO: this is true if 'files':[] in root is iterated,
-        #       if I do not jump over it, the recursion stop. why?
-        if k == 'files' and len(v) == 0:
-            continue
-
         if isinstance(v, list):
             for item in v:
                 local_list.append(f'{path}/{item}')
-            final_lib.extend(local_list)
+
+        if len(lib) == 1 and len(v) == 0:
+            return local_list
 
         if isinstance(v, dict):
-            final_lib.extend(_to_list(v, path, final_lib))
-
             if path != REMOTE_MUSIC_LIB_ROOT_DIR:
-                final_lib.append(path)
+                local_list.append(path)
+            local_list.extend(_to_list(v, path))
 
             # we've done a directory, go back one directory
             path = str(Path(path).parent)
             if path == '.':
                 path = ''
 
-    return final_lib
+    return local_list
 
 
 def _calculate_delta(local_lib, target_lib):
     to_add = set(local_lib) - set(target_lib)
     to_delete = set(target_lib) - set(local_lib)
+
+    to_add = sorted(to_add)
+    to_delete = sorted(to_delete)
 
     ## <remove folders>
     remove = set()
@@ -193,7 +181,6 @@ def _sync_delete(ftp, lib):
     lib = sorted(lib, key=lambda s: len(s), reverse=True)
 
     for item in lib:
-        logging.info(f'Removing {item}...')
         item = UL.url2pathname(item)
 
         item = f'{REMOTE_MUSIC_LIB_ROOT_DIR}/{item}'
@@ -206,7 +193,7 @@ def _sync_delete(ftp, lib):
             item_type = 'file'
 
         try:
-            logging.debug(f'Attempting to delete {item_type} {item}')
+            logging.debug(f'Delete {item_type} {item}')
 
             if item_type == 'file':
                 ftp.delete(item)
@@ -238,7 +225,6 @@ def _sync_add(ftp, source_lib, lib):
             if tmp == REMOTE_MUSIC_LIB_ROOT_DIR:
                 # TODO: can this be done more elegant?
                 continue
-            logging.info(f'mkdir: {tmp}')
             ftp.mkd(tmp)
         # </DIR>
 
@@ -278,6 +264,7 @@ def main() -> int:
 
     if not empty_target:
         target_lib = _to_list(target_lib)
+        logging.debug('_to_list() ended')
 
     add, remove = _calculate_delta(local_lib, target_lib)
 
