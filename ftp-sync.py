@@ -217,6 +217,10 @@ def _sync_add(ftp, source_lib, lib):
 
         tmp = ''
         for d in dirs:
+            if d == '.':
+                # TODO: why do I get a dot? Can I remove it before I get here?
+                continue
+
             if not tmp:
                 tmp = f'{REMOTE_MUSIC_LIB_ROOT_DIR}/{d}'
             else:
@@ -225,6 +229,8 @@ def _sync_add(ftp, source_lib, lib):
             if tmp == REMOTE_MUSIC_LIB_ROOT_DIR:
                 # TODO: can this be done more elegant?
                 continue
+
+            logging.debug(f'Creating dir "{tmp}"')
             ftp.mkd(tmp)
         # </DIR>
 
