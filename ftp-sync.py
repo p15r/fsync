@@ -115,7 +115,13 @@ def _to_list(lib, path='') -> List[str]:
 
         if isinstance(v, list):
             for item in v:
-                local_list.append(f'{path}/{item}')
+                if path == '':
+                    # do not prefix files w/ path if in root
+                    p = item
+                else:
+                    p = f'{path}/{item}'
+
+                local_list.append(p)
 
         if len(lib) == 1 and len(v) == 0:
             return local_list
