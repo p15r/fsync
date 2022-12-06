@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
 import argparse
+import urllib.request as UL
+from datetime import datetime
 from ftplib import FTP
 from pathlib import Path
 from typing import List
+import logging
+import os
 
 
+# NO TRAILING SLASH
 REMOTE_MUSIC_LIB_ROOT_DIR = 'foobar2000 Music Folder'
+
+LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
+logging.basicConfig(level=LOGLEVEL)
+
+
+
+# TODO: make helpers: path2url & url2path
 
 
 def _usage() -> str:
@@ -28,19 +40,19 @@ def _usage() -> str:
 
 def _login(target: str) -> FTP:
     ftp = FTP(target)
+    ftp.set_debuglevel(0)
     ftp.login()
 
     welcome = ftp.getwelcome()
 
     if welcome:
-        print(f'Target greeting: {welcome}')
+        logging.info(f'Target greeting: {welcome}')
 
     return ftp
 
 
 def _path_encode(p):
-    from urllib.request import pathname2url
-    return pathname2url(p)
+    return UL.pathname2url(p)
 
 
 def _list_remote(ftp: FTP, cwd=None, files={}) -> List[str]:
@@ -69,7 +81,7 @@ def _list_remote(ftp: FTP, cwd=None, files={}) -> List[str]:
         _list_remote(
             ftp,
             f'{cwd}/{d}',
-            files[k_cwd]
+            files[k_cwd],
         )
 
     return files
@@ -96,7 +108,6 @@ def _to_list(lib, path='', final_lib=[]) -> List[str]:
         # for music lib comparison, paths must be from lib root
         path = ''
 
-    #breakpoint()
     for k, v in lib.items():
         if k != 'files':
             # TODO: doc why k != 'files'
@@ -105,10 +116,19 @@ def _to_list(lib, path='', final_lib=[]) -> List[str]:
             else:
                 path = f'{path}/{k}'
 
+        # do I need this?
+        # last dir in path (e.g. lib/pop/01/)
+ #       if len(lib) == 1 and len(v) == 0:
+ #           # only 'files' key left, empty
+ #           # add empty dir
+ #           return [path]
+
         # TODO: this is true if 'files':[] in root is iterated,
         #       if I do not jump over it, the recursion stop. why?
-        if k == 'files' and len(v) == 0: continue
+        if k == 'files' and len(v) == 0: 
+            continue
 
+        #breakpoint()
         if isinstance(v, list):
             for item in v:
                 local_list.append(f'{path}/{item}')
@@ -116,6 +136,9 @@ def _to_list(lib, path='', final_lib=[]) -> List[str]:
 
         if isinstance(v, dict):
             final_lib.extend(_to_list(v, path, final_lib))
+
+            if path != REMOTE_MUSIC_LIB_ROOT_DIR:
+                final_lib.append(path)
 
             # we've done a directory, go back one directory
             path = str(Path(path).parent)
@@ -136,7 +159,7 @@ def _calculate_delta(local_lib, target_lib):
         if len(child.split('.')) == 1:
             # TODO:
             # if a folder has a dot in it, it would not be removed and
-            # thus synced to the target (solved when using Path instead of 
+            # thus synced to the target (solved when using Path instead of
             # strings; then we do not even add dirs to the lib.
             remove.add(item)
 
@@ -144,37 +167,133 @@ def _calculate_delta(local_lib, target_lib):
         to_add.remove(item)
     ## </remove folders>
 
-    print('### Tracks to sync:')
-    [print(f'- {x}') for x in sorted(to_add)]
+    logging.info('Tracks to sync:')
+    if len(to_add) == 0:
+        logging.info('! Nothing to sync')
+    else:
+        [logging.info(f'+ {x}') for x in to_add]
 
-    print('\n### Tracks to delete:')
-    [print(f'- {x}') for x in sorted(to_delete)]
+    logging.info('Tracks to remove:')
+    if len(to_delete) == 0:
+        logging.info('! Nothing to remove')
+    else:
+        [logging.info(f'- {x}') for x in to_delete]
+        input('Continue and remove files?')
 
     return to_add, to_delete
+
+
+def _sync_delete(ftp, lib):
+    logging.info('Removing files on target...')
+
+    # TODO: my delta compute mechanism doesn't allow me to figure out if
+    #       a folder has been removed, thus I need to iterate over all
+    #       folders, check if they are empty, then delete them
+
+    lib = sorted(lib, reverse=True)
+
+    for item in lib:
+        logging.info(f'Removing {item}...')
+        item = UL.url2pathname(item)
+
+        item = f'{REMOTE_MUSIC_LIB_ROOT_DIR}/{item}'
+
+        item_type = ''
+        split = item.split('.')
+        if len(split) == 1:
+            item_type = 'directory'
+        else:
+            item_type = 'file'
+
+        try:
+            logging.debug(f'Attempting to delete {item_type} {item}')
+
+            if item_type == 'file':
+                ftp.delete(item)
+
+            if item_type == 'directory':
+                ftp.rmd(item)
+        except Exception as e:
+            logging.error(f'Failed to remove {item_type} {item}: {e}')
+
+
+def _sync_add(ftp, source_lib, lib):
+    for item in lib:
+        item = UL.url2pathname(item)
+        path = f'{source_lib}/{item}'
+
+        # TODO: ensure lib is sorted - didn't I do this before??
+
+        # <DIR>
+        dir = str(Path(item).parent)
+        dirs = dir.split('/')
+
+        tmp = ''
+        for d in dirs:
+            if not tmp:
+                tmp = f'{REMOTE_MUSIC_LIB_ROOT_DIR}/{d}'
+            else:
+                tmp = f'{tmp}/{d}'
+
+            if tmp == REMOTE_MUSIC_LIB_ROOT_DIR:
+                # TODO: can this be done more elegant?
+                continue
+            logging.info(f'mkdir: {tmp}')
+            ftp.mkd(tmp)
+        # </DIR>
+
+        # TODO: print bytes transfered
+        # TODO: stat: file x of total (progress percentage)
+        with open(path, 'rb') as f_handle:
+            logging.info(f'Uploading {item}...')
+            # cwd?
+            ftp.storbinary(
+                f'STOR {REMOTE_MUSIC_LIB_ROOT_DIR}/{item}',
+                f_handle
+            )
 
 
 def main() -> int:
     source_lib, target = _usage()
 
-    #print('Authenticating...')
-    #ftp = _login(target)
-
-    #print('List remote music library...')
-    #target_lib = _list_remote(ftp)
+    start_sync = datetime.now()
 
     local_lib = _list_local(Path(source_lib))
+    
+    if len(local_lib) == 0:
+        input('Local library is empty. Delete everything on target?')
 
-    with open('mock_remote_lib.json', 'r') as f:
-        import json
-        target_lib = json.load(f)
+    logging.info('Authenticating...')
+    ftp = _login(target)
 
-    target_lib = _to_list(target_lib)
+    logging.info('Get target music library...')
+    target_lib = _list_remote(ftp)
+    logging.debug(f'Files in target media lib: {target_lib}')
+
+    empty_target = False
+    # TODO: is this always a list?
+    if isinstance(target_lib, list):
+        logging.info('No files found on target...')
+        empty_target = True
+
+    if not empty_target:
+        target_lib = _to_list(target_lib)
 
     add, remove = _calculate_delta(local_lib, target_lib)
 
-    breakpoint()
+    if not empty_target:
+        logging.info('Removing files from target...')
+        _sync_delete(ftp, remove)
 
-    # TODO: terminate connection
+    logging.info('Syncing files to target...')
+    _sync_add(ftp, source_lib, add)
+
+    # TODO: rename ftp to ftp_session
+    ftp.quit()
+
+    end_sync = datetime.now()
+    duration = end_sync - start_sync
+    logging.info(f'Sync took {duration}')
 
     return 1
 
