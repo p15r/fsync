@@ -218,7 +218,7 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
     else:
         for x in delete:
             logging.info(f'- {UL.url2pathname(x)}')
-        input('Continue and remove files?')
+        input('Continue and sync files?')
 
     return add, delete
 
@@ -256,8 +256,15 @@ def _sync_delete(config: Config, ftp: FTP, lib: List[str]):
             logging.error(f'Failed to remove {item_type} {item}: {e}')
 
 
-def _sync_add(config: Config, ftp: FTP, source_lib: str, lib: List[str]):
+def _sync_add(
+    config: Config,
+    ftp: FTP,
+    source_lib: str,
+    lib: List[str]
+) -> float:
     logging.info('Syncing files to target...')
+    mbytes_transferred: float = 0
+
     for item in lib:
         item = UL.url2pathname(item)
         path = f'{source_lib}/{item}'
@@ -287,16 +294,19 @@ def _sync_add(config: Config, ftp: FTP, source_lib: str, lib: List[str]):
             ftp.mkd(tmp)
         # </DIR>
 
-        # TODO: print bytes transferred
         # TODO: stat: file x of total (progress percentage)
+        size = Path(path).stat().st_size / (1 << 20)
+        size_r = round(size, 2)
         with open(path, 'rb') as f_handle:
-            logging.info(f'Uploading {item}...')
-            # cwd?
-            logging.debug(f'Uploading file "{item}"')
+            logging.info(f'Uploading {item} ({size_r} MB)...')
             ftp.storbinary(
                 f'STOR {config.target_music_lib_root_dir}/{item}',
                 f_handle
             )
+
+        mbytes_transferred += size
+
+    return mbytes_transferred
 
 
 def main() -> int:
@@ -343,15 +353,23 @@ def main() -> int:
     if remove:
         _sync_delete(config, ftp, remove)
 
+    mbytes_transferred: float = 0.0
     if add:
-        _sync_add(config, ftp, config.local_music_library, add)
+        mbytes_transferred = _sync_add(
+            config,
+            ftp,
+            config.local_music_library,
+            add
+        )
 
     # TODO: rename ftp to ftp_session
     ftp.quit()
 
     end_sync = datetime.now()
     duration = end_sync - start_sync
-    logging.info(f'Sync took {duration}')
+    logging.info(
+        f'Sync took {duration} ({round(mbytes_transferred, 2)} MB transferred)'
+    )
 
     return 0
 
