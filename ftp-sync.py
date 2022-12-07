@@ -327,10 +327,11 @@ def main() -> int:
         logging.info('No files found on target...')
         empty_target = True
 
+    target_lib_converted = []
     if not empty_target:
-        target_lib = _to_list(config, target_lib)
+        target_lib_converted = _to_list(config, target_lib)
 
-    add, remove = _calculate_delta(local_lib, target_lib)
+    add, remove = _calculate_delta(local_lib, target_lib_converted)
 
     if remove:
         _sync_delete(config, ftp, remove)
