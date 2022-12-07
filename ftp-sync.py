@@ -6,6 +6,7 @@ import urllib.request as UL
 from datetime import datetime
 from ftplib import FTP
 from pathlib import Path
+from typing import Dict
 from typing import List
 
 
@@ -13,7 +14,7 @@ from typing import List
 REMOTE_MUSIC_LIB_ROOT_DIR = 'foobar2000 Music Folder'
 
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
-logging.basicConfig(level=LOGLEVEL)
+logging.basicConfig(level=LOGLEVEL, format='%(message)s')
 
 
 
@@ -48,7 +49,7 @@ def _login(target: str) -> FTP:
     welcome = ftp.getwelcome()
 
     if welcome:
-        logging.info(f'Target greeting: {welcome}')
+        logging.info(f'Greeting from target: {welcome}')
 
     return ftp
 
@@ -58,7 +59,7 @@ def _path_encode(p):
     return UL.pathname2url(p)
 
 
-def _list_remote(ftp: FTP, cwd=None, files={}) -> List[str]:
+def _list_remote(ftp: FTP, cwd=None, files={}) -> Dict[str,str]:
     if not cwd:
         cwd = REMOTE_MUSIC_LIB_ROOT_DIR
         files[cwd] = {}
@@ -164,13 +165,13 @@ def _calculate_delta(local_lib, target_lib):
         to_add.remove(item)
     ## </remove folders>
 
-    logging.info('Tracks to sync:')
+    logging.info('Files to sync to target:')
     if len(to_add) == 0:
         logging.info('! Nothing to sync')
     else:
         [logging.info(f'+ {UL.url2pathname(x)}') for x in to_add]
 
-    logging.info('Tracks to remove:')
+    logging.info('Files to remove on target:')
     if len(to_delete) == 0:
         logging.info('! Nothing to remove')
     else:
@@ -181,7 +182,7 @@ def _calculate_delta(local_lib, target_lib):
 
 
 def _sync_delete(ftp, lib):
-    logging.info('Removing files on target...')
+    logging.info('Removing files from target...')
 
     # TODO: my delta compute mechanism doesn't allow me to figure out if
     #       a folder has been removed, thus I need to iterate over all
@@ -214,6 +215,7 @@ def _sync_delete(ftp, lib):
 
 
 def _sync_add(ftp, source_lib, lib):
+    logging.info('Syncing files to target...')
     for item in lib:
         item = UL.url2pathname(item)
         path = f'{source_lib}/{item}'
@@ -272,9 +274,10 @@ def main() -> int:
     target_lib = _list_remote(ftp)
     logging.debug(f'Files in target media lib: {target_lib}')
 
+    # TODO: remove empty target once target_lib has been refactored
+    #       and doesn't break _to_list() if empty
     empty_target = False
-    # TODO: is this always a list?
-    if isinstance(target_lib, list):
+    if not target_lib:
         logging.info('No files found on target...')
         empty_target = True
 
@@ -283,12 +286,11 @@ def main() -> int:
 
     add, remove = _calculate_delta(local_lib, target_lib)
 
-    if not empty_target:
-        logging.info('Removing files from target...')
+    if remove:
         _sync_delete(ftp, remove)
 
-    logging.info('Syncing files to target...')
-    _sync_add(ftp, source_lib, add)
+    if add:
+        _sync_add(ftp, source_lib, add)
 
     # TODO: rename ftp to ftp_session
     ftp.quit()
