@@ -9,6 +9,7 @@ from ftplib import FTP  # nosec
 from pathlib import Path
 from typing import Dict
 from typing import List
+from typing import Tuple
 
 import yaml
 
@@ -29,7 +30,7 @@ class Config:
 # TODO: make helpers: path2url & url2path
 
 
-def _usage() -> str:
+def _usage() -> Tuple[str, str, str]:
     parser = argparse.ArgumentParser(
         description=(
             'Syncs local files to target (FTP server). Local is master '
@@ -111,7 +112,7 @@ def _list_remote(config, ftp: FTP, cwd=None, files={}) -> Dict[str, str]:
     files[k_cwd]['files'] = f
 
     if len(dr) == 0:
-        return f
+        return {}
 
     for d in dr:
         files[k_cwd][d] = {}
