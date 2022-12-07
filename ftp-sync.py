@@ -223,7 +223,7 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
     return add, delete
 
 
-def _sync_delete(config, ftp, lib):
+def _sync_delete(config: Config, ftp: FTP, lib: List[str]):
     logging.info('Removing files from target...')
 
     # TODO: my delta compute mechanism doesn't allow me to figure out if
@@ -256,7 +256,7 @@ def _sync_delete(config, ftp, lib):
             logging.error(f'Failed to remove {item_type} {item}: {e}')
 
 
-def _sync_add(config, ftp, source_lib, lib):
+def _sync_add(config: Config, ftp: FTP, source_lib: str, lib: List[str]):
     logging.info('Syncing files to target...')
     for item in lib:
         item = UL.url2pathname(item)
@@ -353,7 +353,7 @@ def main() -> int:
     duration = end_sync - start_sync
     logging.info(f'Sync took {duration}')
 
-    return 1
+    return 0
 
 
 if __name__ == '__main__':
