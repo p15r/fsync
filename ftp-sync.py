@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 import argparse
-from dataclasses import dataclass
 import logging
 import os
 import urllib.request as UL
+from dataclasses import dataclass
 from datetime import datetime
-from ftplib import FTP
+from ftplib import FTP  # nosec
 from pathlib import Path
 from typing import Dict
 from typing import List
+
 import yaml
 
 
@@ -62,7 +63,7 @@ def _usage() -> str:
 
 def _load_config():
     with open(CONFIG_FILE, 'r') as f_handle:
-        cnt = yaml.load(f_handle)
+        cnt = yaml.safe_load(f_handle)
 
     # `**cnt` unpacks dict into list of args for dataclass
     config = Config(**cnt)
@@ -70,7 +71,7 @@ def _load_config():
     return config
 
 def _login(target: str) -> FTP:
-    ftp = FTP(target)
+    ftp = FTP(target)   # nosec
     ftp.encoding='utf-8'
     ftp.set_debuglevel(0)
     ftp.login()
