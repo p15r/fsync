@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+from dataclasses import dataclass
 import logging
 import os
 import urllib.request as UL
@@ -8,14 +9,19 @@ from ftplib import FTP
 from pathlib import Path
 from typing import Dict
 from typing import List
+import yaml
 
 
-# NO TRAILING SLASH
-REMOTE_MUSIC_LIB_ROOT_DIR = 'foobar2000 Music Folder'
+CONFIG_FILE = './config.yml'
 
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 logging.basicConfig(level=LOGLEVEL, format='%(message)s')
 
+@dataclass
+class Config:
+    local_music_library: str
+    target_ip_address: str
+    target_music_lib_root_dir: str
 
 
 # TODO: make helpers: path2url & url2path
@@ -23,21 +29,45 @@ logging.basicConfig(level=LOGLEVEL, format='%(message)s')
 
 def _usage() -> str:
     parser = argparse.ArgumentParser(
-        prog = 'FTP Sync',
-        description = 'Syncs local files to remote. Local is master.',
-        epilog = 'Source: https://github.com:p15r'
+        description = (
+            'Syncs local files to target (FTP server). Local is master '
+            '(local changes are mirrored). '
+            'Parameters are optional and overwrite settings from `config.yml`.'
+        ),
+        epilog = 'Source: https://github.com/p15r/py-ftp-music-sync'
     )
 
-    parser.add_argument('music_lib', help='path to local music library')
-    parser.add_argument('target', help='sync target IP address')
+    parser.add_argument(
+        '--lib',
+        required=False,
+        help='path to local music library'
+    )
+    parser.add_argument(
+        '--target',
+        required=False,
+        nargs='?',
+        help='sync target IP address'
+    )
+    parser.add_argument(
+        '--target-lib',
+        required=False,
+        nargs='?',
+        help='path to music library on target'
+    )
 
     args = parser.parse_args()
-    target = args.target
 
-    source_lib = args.music_lib
+    return args.lib, args.target, args.target_lib
 
-    return source_lib, target
 
+def _load_config():
+    with open(CONFIG_FILE, 'r') as f_handle:
+        cnt = yaml.load(f_handle)
+
+    # `**cnt` unpacks dict into list of args for dataclass
+    config = Config(**cnt)
+
+    return config
 
 def _login(target: str) -> FTP:
     ftp = FTP(target)
@@ -59,9 +89,9 @@ def _path_encode(p):
     return UL.pathname2url(p)
 
 
-def _list_remote(ftp: FTP, cwd=None, files={}) -> Dict[str,str]:
+def _list_remote(config, ftp: FTP, cwd=None, files={}) -> Dict[str,str]:
     if not cwd:
-        cwd = REMOTE_MUSIC_LIB_ROOT_DIR
+        cwd = config.target_music_lib_root_dir
         files[cwd] = {}
 
     k_cwd = cwd.split('/')[-1]
@@ -83,6 +113,7 @@ def _list_remote(ftp: FTP, cwd=None, files={}) -> Dict[str,str]:
     for d in dr:
         files[k_cwd][d] = {}
         _list_remote(
+            config,
             ftp,
             f'{cwd}/{d}',
             files[k_cwd],
@@ -104,10 +135,10 @@ def _list_local(music_lib: Path) -> List[str]:
     return files
 
 
-def _to_list(lib, path='') -> List[str]:
+def _to_list(config, lib, path='') -> List[str]:
     local_list = []
 
-    if path == REMOTE_MUSIC_LIB_ROOT_DIR:
+    if path == config.target_music_lib_root_dir:
         path = ''
 
     for k, v in lib.items():
@@ -131,9 +162,9 @@ def _to_list(lib, path='') -> List[str]:
             return local_list
 
         if isinstance(v, dict):
-            if path != REMOTE_MUSIC_LIB_ROOT_DIR:
+            if path != config.target_music_lib_root_dir:
                 local_list.append(path)
-            local_list.extend(_to_list(v, path))
+            local_list.extend(_to_list(config, v, path))
 
             # we've done a directory, go back one directory
             path = str(Path(path).parent)
@@ -181,7 +212,7 @@ def _calculate_delta(local_lib, target_lib):
     return to_add, to_delete
 
 
-def _sync_delete(ftp, lib):
+def _sync_delete(config, ftp, lib):
     logging.info('Removing files from target...')
 
     # TODO: my delta compute mechanism doesn't allow me to figure out if
@@ -193,7 +224,7 @@ def _sync_delete(ftp, lib):
     for item in lib:
         item = UL.url2pathname(item)
 
-        item = f'{REMOTE_MUSIC_LIB_ROOT_DIR}/{item}'
+        item = f'{config.target_music_lib_root_dir}/{item}'
 
         item_type = ''
         split = item.split('.')
@@ -214,7 +245,7 @@ def _sync_delete(ftp, lib):
             logging.error(f'Failed to remove {item_type} {item}: {e}')
 
 
-def _sync_add(ftp, source_lib, lib):
+def _sync_add(config, ftp, source_lib, lib):
     logging.info('Syncing files to target...')
     for item in lib:
         item = UL.url2pathname(item)
@@ -233,11 +264,11 @@ def _sync_add(ftp, source_lib, lib):
                 continue
 
             if not tmp:
-                tmp = f'{REMOTE_MUSIC_LIB_ROOT_DIR}/{d}'
+                tmp = f'{config.target_music_lib_root_dir}/{d}'
             else:
                 tmp = f'{tmp}/{d}'
 
-            if tmp == REMOTE_MUSIC_LIB_ROOT_DIR:
+            if tmp == config.target_music_lib_root_dir:
                 # TODO: can this be done more elegant?
                 continue
 
@@ -252,26 +283,37 @@ def _sync_add(ftp, source_lib, lib):
             # cwd?
             logging.debug(f'Uploading file "{item}"')
             ftp.storbinary(
-                f'STOR {REMOTE_MUSIC_LIB_ROOT_DIR}/{item}',
+                f'STOR {config.target_music_lib_root_dir}/{item}',
                 f_handle
             )
 
 
 def main() -> int:
-    source_lib, target = _usage()
+    config = _load_config()
+
+    param_source_lib, param_target, param_target_lib = _usage()
+
+    if param_source_lib:
+        config.local_music_library = param_source_lib
+
+    if param_target:
+        config.target_ip_address = param_target
+
+    if param_target_lib:
+        config.target_music_lib_root_dir = param_target_lib
 
     start_sync = datetime.now()
 
-    local_lib = _list_local(Path(source_lib))
+    local_lib = _list_local(Path(config.local_music_library))
 
     if len(local_lib) == 0:
         input('Local library is empty. Delete everything on target?')
 
     logging.info('Authenticating...')
-    ftp = _login(target)
+    ftp = _login(config.target_ip_address)
 
     logging.info('Get target music library...')
-    target_lib = _list_remote(ftp)
+    target_lib = _list_remote(config, ftp)
     logging.debug(f'Files in target media lib: {target_lib}')
 
     # TODO: remove empty target once target_lib has been refactored
@@ -282,15 +324,15 @@ def main() -> int:
         empty_target = True
 
     if not empty_target:
-        target_lib = _to_list(target_lib)
+        target_lib = _to_list(config, target_lib)
 
     add, remove = _calculate_delta(local_lib, target_lib)
 
     if remove:
-        _sync_delete(ftp, remove)
+        _sync_delete(config, ftp, remove)
 
     if add:
-        _sync_add(ftp, source_lib, add)
+        _sync_add(config, ftp, config.local_music_library, add)
 
     # TODO: rename ftp to ftp_session
     ftp.quit()
