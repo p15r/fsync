@@ -1,8 +1,8 @@
 # local music library to sync to target. absolute path.
-local_music_library: /home/pat/music_sync_small/
+local_music_library: /home/pat/music_sync
 
 # target system to sync with local music library
-target_ip_address: 10.0.0.172
+target_ip_address: 10.0.0.173
 
 # target music library folder, no trailing slashes
 # TODO: root slash not yet supported
