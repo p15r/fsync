@@ -18,6 +18,7 @@ CONFIG_FILE = './config.yml'
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 logging.basicConfig(level=LOGLEVEL, format='%(message)s')
 
+
 @dataclass
 class Config:
     local_music_library: str
@@ -30,12 +31,12 @@ class Config:
 
 def _usage() -> str:
     parser = argparse.ArgumentParser(
-        description = (
+        description=(
             'Syncs local files to target (FTP server). Local is master '
             '(local changes are mirrored). '
             'Parameters are optional and overwrite settings from `config.yml`.'
         ),
-        epilog = 'Source: https://github.com/p15r/py-ftp-music-sync'
+        epilog='Source: https://github.com/p15r/ftp-sync'
     )
 
     parser.add_argument(
@@ -70,9 +71,10 @@ def _load_config():
 
     return config
 
+
 def _login(target: str) -> FTP:
     ftp = FTP(target)   # nosec
-    ftp.encoding='utf-8'
+    ftp.encoding = 'utf-8'
     ftp.set_debuglevel(0)
     ftp.login()
     ftp.sendcmd('OPTS UTF8 ON')
@@ -90,7 +92,7 @@ def _path_encode(p):
     return UL.pathname2url(p)
 
 
-def _list_remote(config, ftp: FTP, cwd=None, files={}) -> Dict[str,str]:
+def _list_remote(config, ftp: FTP, cwd=None, files={}) -> Dict[str, str]:
     if not cwd:
         cwd = config.target_music_lib_root_dir
         files[cwd] = {}
@@ -182,7 +184,7 @@ def _calculate_delta(local_lib, target_lib):
     to_add = sorted(to_add)
     to_delete = sorted(to_delete)
 
-    ## <remove folders>
+    # <remove folders>
     remove = set()
     for item in to_add:
         child = item.split('/')[-1]
@@ -195,7 +197,7 @@ def _calculate_delta(local_lib, target_lib):
 
     for item in remove:
         to_add.remove(item)
-    ## </remove folders>
+    # </remove folders>
 
     logging.info('Files to sync to target:')
     if len(to_add) == 0:
@@ -277,7 +279,7 @@ def _sync_add(config, ftp, source_lib, lib):
             ftp.mkd(tmp)
         # </DIR>
 
-        # TODO: print bytes transfered
+        # TODO: print bytes transferred
         # TODO: stat: file x of total (progress percentage)
         with open(path, 'rb') as f_handle:
             logging.info(f'Uploading {item}...')
