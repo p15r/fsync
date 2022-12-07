@@ -210,14 +210,24 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
         logging.info('! Nothing to sync')
     else:
         for x in add:
-            logging.info(f'+ {UL.url2pathname(x)}')
+            p = UL.url2pathname(x)
+            if len(p) > 77:
+                msg = f'+ ...{p[len(p)-77:]}'
+            else:
+                msg = f'+ {p}'
+            logging.info(msg)
 
     logging.info('Files to remove on target:')
     if len(delete) == 0:
         logging.info('! Nothing to remove')
     else:
         for x in delete:
-            logging.info(f'- {UL.url2pathname(x)}')
+            p = UL.url2pathname(x)
+            if len(p) > 77:
+                msg = f'- ...{p[len(p)-77:]}'
+            else:
+                msg = f'- {p}'
+            logging.info(msg)
         input('Continue and sync files?')
 
     return add, delete
@@ -298,7 +308,11 @@ def _sync_add(
         size = Path(path).stat().st_size / (1 << 20)
         size_r = round(size, 2)
         with open(path, 'rb') as f_handle:
-            logging.info(f'Uploading {item} ({size_r} MB)...')
+            if len(item) > 77:
+                msg = f'Uploading ...{item[len(item)-77:]} ({size_r} MB)...'
+            else:
+                msg = f'Uploading {item} ({size_r} MB)...'
+            logging.info(msg)
             ftp.storbinary(
                 f'STOR {config.target_music_lib_root_dir}/{item}',
                 f_handle
