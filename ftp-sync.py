@@ -63,7 +63,7 @@ def _usage() -> Tuple[str, str, str]:
     return args.lib, args.target, args.target_lib
 
 
-def _load_config():
+def _load_config() -> Config:
     with open(CONFIG_FILE, 'r') as f_handle:
         cnt = yaml.safe_load(f_handle)
 
@@ -93,7 +93,12 @@ def _path_encode(p):
     return UL.pathname2url(p)
 
 
-def _list_remote(config, ftp: FTP, cwd=None, files={}) -> Dict[str, str]:
+def _list_remote(
+    config: Config,
+    ftp: FTP,
+    cwd: str = '',
+    files: Dict = {}
+) -> Dict[str, str]:
     if not cwd:
         cwd = config.target_music_lib_root_dir
         files[cwd] = {}
@@ -139,8 +144,8 @@ def _list_local(music_lib: Path) -> List[str]:
     return files
 
 
-def _to_list(config, lib, path='') -> List[str]:
-    local_list = []
+def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
+    local_list: List[str] = []
 
     if path == config.target_music_lib_root_dir:
         path = ''
@@ -178,16 +183,16 @@ def _to_list(config, lib, path='') -> List[str]:
     return local_list
 
 
-def _calculate_delta(local_lib, target_lib):
+def _calculate_delta(local_lib: List[str], target_lib: List[str]):
     to_add = set(local_lib) - set(target_lib)
     to_delete = set(target_lib) - set(local_lib)
 
-    to_add = sorted(to_add)
-    to_delete = sorted(to_delete)
+    add = sorted(to_add)
+    delete = sorted(to_delete)
 
     # <remove folders>
     remove = set()
-    for item in to_add:
+    for item in add:
         child = item.split('/')[-1]
         if len(child.split('.')) == 1:
             # TODO:
@@ -197,23 +202,25 @@ def _calculate_delta(local_lib, target_lib):
             remove.add(item)
 
     for item in remove:
-        to_add.remove(item)
+        add.remove(item)
     # </remove folders>
 
     logging.info('Files to sync to target:')
-    if len(to_add) == 0:
+    if len(add) == 0:
         logging.info('! Nothing to sync')
     else:
-        [logging.info(f'+ {UL.url2pathname(x)}') for x in to_add]
+        for x in add:
+            logging.info(f'+ {UL.url2pathname(x)}')
 
     logging.info('Files to remove on target:')
-    if len(to_delete) == 0:
+    if len(delete) == 0:
         logging.info('! Nothing to remove')
     else:
-        [logging.info(f'- {UL.url2pathname(x)}') for x in to_delete]
+        for x in delete:
+            logging.info(f'- {UL.url2pathname(x)}')
         input('Continue and remove files?')
 
-    return to_add, to_delete
+    return add, delete
 
 
 def _sync_delete(config, ftp, lib):
