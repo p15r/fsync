@@ -96,36 +96,37 @@ def _path_encode(p):
 def _list_remote(
     config: Config,
     ftp: FTP,
-    cwd: str = '',
-    files: Dict = {}
+    path: str = '',
 ) -> Dict[str, str]:
-    if not cwd:
-        cwd = config.target_music_lib_root_dir
-        files[cwd] = {}
+    files: Dict = {}
 
-    k_cwd = cwd.split('/')[-1]
+    if not path:
+        path = config.target_music_lib_root_dir
+
+    # cwd = path.split('/')[-1]
 
     dr = []     # subdirs in current dir
     f = []      # files in current dir
-    for name, meta in ftp.mlsd(path=cwd):
+    for name, meta in ftp.mlsd(path=path):
         if meta['type'] == 'file':
             f.append(_path_encode(name))
 
         if meta['type'] == 'dir':
             dr.append(name)
 
-    files[k_cwd]['files'] = f
+        files['files'] = f
 
     if len(dr) == 0:
-        return {}
+        return files
 
     for d in dr:
-        files[k_cwd][d] = {}
-        _list_remote(
+        if d not in files:
+            files[d] = {}
+
+        files[d] = _list_remote(
             config,
             ftp,
-            f'{cwd}/{d}',
-            files[k_cwd],
+            f'{path}/{d}',
         )
 
     return files
@@ -349,6 +350,7 @@ def main() -> int:
 
     logging.info('Get target music library...')
     target_lib = _list_remote(config, ftp)
+    breakpoint()
     logging.debug(f'Files in target media lib: {target_lib}')
 
     # TODO: remove empty target once target_lib has been refactored
