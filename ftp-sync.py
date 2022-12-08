@@ -350,7 +350,6 @@ def main() -> int:
 
     logging.info('Get target music library...')
     target_lib = _list_remote(config, ftp)
-    breakpoint()
     logging.debug(f'Files in target media lib: {target_lib}')
 
     # TODO: remove empty target once target_lib has been refactored
