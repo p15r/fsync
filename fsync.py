@@ -183,7 +183,10 @@ def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
     return lib_converted
 
 
-def _calculate_delta(local_lib: List[Path], target_lib: List[str]):
+def _calculate_delta(
+    local_lib: List[Path],
+    target_lib: List[str]
+) -> Tuple[List[str], List[str]]:
     # convert list of Path objects to list of strings
     local_lib_str = [p.as_posix() for p in local_lib]
 
@@ -199,8 +202,7 @@ def _calculate_delta(local_lib: List[Path], target_lib: List[str]):
     if len(add) == 0:
         logging.info('! Nothing to sync')
     else:
-        for x in add:
-            p = x
+        for p in add:
             if len(p) > 77:
                 msg = f'+ ...{p[len(p)-77:]}'
             else:
@@ -211,13 +213,13 @@ def _calculate_delta(local_lib: List[Path], target_lib: List[str]):
     if len(delete) == 0:
         logging.info('! Nothing to remove')
     else:
-        for x in delete:
-            p = x
+        for p in delete:
             if len(p) > 77:
                 msg = f'- ...{p[len(p)-77:]}'
             else:
                 msg = f'- {p}'
             logging.info(msg)
+
         input('Continue?')
 
     return add, delete
