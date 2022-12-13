@@ -6,4 +6,4 @@ target_ip_address: 192.168.1.xxx
 
 # target music library folder, no trailing slashes
 # TODO: root slash not yet supported
-target_music_lib_root_dir: path/to/remote/music_library
+target_music_lib_root_dir: path/to/target/music_library
