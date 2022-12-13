@@ -49,13 +49,11 @@ def _usage() -> Tuple[str, str, str]:
     parser.add_argument(
         '--target',
         required=False,
-        nargs='?',
         help='sync target IP address'
     )
     parser.add_argument(
         '--target-lib',
         required=False,
-        nargs='?',
         help='path to music library on target'
     )
 
