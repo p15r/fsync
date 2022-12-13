@@ -38,7 +38,7 @@ def _usage() -> Tuple[str, str, str]:
             '(local changes are mirrored). '
             'Parameters are optional and overwrite settings from `config.yml`.'
         ),
-        epilog='Source: https://github.com/p15r/ftp-sync'
+        epilog='Source: https://github.com/p15r/fsync'
     )
 
     parser.add_argument(
