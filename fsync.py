@@ -75,7 +75,6 @@ def _load_config() -> Config:
 def _login(target: str) -> FTP:
     ftp = FTP(target)   # nosec
     ftp.encoding = 'utf-8'
-    ftp.set_debuglevel(0)
     ftp.login()
     ftp.sendcmd('OPTS UTF8 ON')
 
