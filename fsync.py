@@ -86,43 +86,37 @@ def _login(target: str) -> FTP:
     return ftp
 
 
-def _list_remote(
-    config: Config,
-    ftp: FTP,
-    path: str = '',
-) -> Dict[str, str]:
-    files: Dict = {}
+def _list_remote(config: Config, ftp: FTP, path: str = '',) -> Dict[str, str]:
+    target_db: Dict = {}
 
     if not path:
         path = config.target_music_lib_root_dir
 
-    # cwd = path.split('/')[-1]
-
-    dr = []     # subdirs in current dir
-    f = []      # files in current dir
+    subdirs = []
+    files = []
     for name, meta in ftp.mlsd(path=path):
         if meta['type'] == 'file':
-            f.append(name)
+            files.append(name)
 
         if meta['type'] == 'dir':
-            dr.append(name)
+            subdirs.append(name)
 
-        files['files'] = f
+        target_db['files'] = files
 
-    if len(dr) == 0:
-        return files
+    if len(subdirs) == 0:
+        return target_db
 
-    for d in dr:
-        if d not in files:
-            files[d] = {}
+    for sd in subdirs:
+        if sd not in target_db:
+            target_db[sd] = {}
 
-        files[d] = _list_remote(
+        target_db[sd] = _list_remote(
             config,
             ftp,
-            f'{path}/{d}',
+            f'{path}/{sd}',
         )
 
-    return files
+    return target_db
 
 
 def _list_local(music_lib: Path) -> List[str]:
@@ -211,7 +205,7 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
                 msg = f'+ {p}'
             logging.info(msg)
 
-    logging.info('Files to remove on target:')
+    logging.info('Files/folders to remove on target:')
     if len(delete) == 0:
         logging.info('! Nothing to remove')
     else:
@@ -222,13 +216,13 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
             else:
                 msg = f'- {p}'
             logging.info(msg)
-        input('Continue and sync files?')
+        input('Continue?')
 
     return add, delete
 
 
 def _sync_delete(config: Config, ftp: FTP, lib: List[str]):
-    logging.info('Removing files from target...')
+    logging.info('Removing files/folders from target...')
 
     # TODO: my delta compute mechanism doesn't allow me to figure out if
     #       a folder has been removed, thus I need to iterate over all
@@ -264,7 +258,7 @@ def _sync_add(
     source_lib: str,
     lib: List[str]
 ) -> float:
-    logging.info('Syncing files to target...')
+    logging.info('Syncing to target...')
     mbytes_transferred: float = 0
 
     for item in lib:
@@ -338,7 +332,7 @@ def main() -> int:
     logging.info('Authenticating...')
     ftp = _login(config.target_ip_address)
 
-    logging.info('Get target music library...')
+    logging.info('Get target library...')
     target_lib = _list_remote(config, ftp)
     logging.debug(f'Files in target media lib: {target_lib}')
 
