@@ -119,13 +119,19 @@ def _list_remote(config: Config, ftp: FTP, path: str = '',) -> Dict[str, str]:
     return target_db
 
 
-def _list_local(music_lib: Path) -> List[str]:
+def _list_local(music_lib: Path) -> List[Path]:
     files = []
 
     for path in music_lib.rglob('*'):
         abs_path = path.resolve()
+
+        if abs_path.is_dir():
+            # empty folders do not get synced to target system
+            if not os.listdir(abs_path):
+                continue
+
         rel_path = abs_path.relative_to(music_lib)
-        files.append(rel_path.as_posix())
+        files.append(rel_path)
 
     return files
 
@@ -153,9 +159,6 @@ def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
             else:
                 path = f'{path}/{k}'
 
-        if path:
-            lib_converted.append(path)
-
         if isinstance(v, list):
             for item in v:
                 if path == '':
@@ -167,6 +170,9 @@ def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
                 lib_converted.append(p)
 
         if isinstance(v, dict):
+            if path:
+                lib_converted.append(path)
+
             lib_converted.extend(_to_list(config, v, path))
 
             # all files of current directory added, go to parent directory
@@ -177,29 +183,17 @@ def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
     return lib_converted
 
 
-def _calculate_delta(local_lib: List[str], target_lib: List[str]):
-    to_add = set(local_lib) - set(target_lib)
-    to_delete = set(target_lib) - set(local_lib)
+def _calculate_delta(local_lib: List[Path], target_lib: List[str]):
+    # convert list of Path objects to list of strings
+    local_lib_str = [p.as_posix() for p in local_lib]
+
+    to_add = set(local_lib_str) - set(target_lib)
+    to_delete = set(target_lib) - set(local_lib_str)
 
     # sort by path length, so that files come first and
     # can be deleted before the directories that contain the files
     add = sorted(to_add)
     delete = sorted(to_delete)
-
-    # <remove folders>
-    remove = set()
-    for item in add:
-        child = item.split('/')[-1]
-        if len(child.split('.')) == 1:
-            # TODO:
-            # if a folder name has a dot in it, it would not be removed and
-            # thus synced to the target (solved when using Path instead of
-            # strings; then we do not even add dirs to the lib.
-            remove.add(item)
-
-    for item in remove:
-        add.remove(item)
-    # </remove folders>
 
     logging.info('Files to sync to target:')
     if len(add) == 0:
