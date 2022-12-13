@@ -181,6 +181,8 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
     to_add = set(local_lib) - set(target_lib)
     to_delete = set(target_lib) - set(local_lib)
 
+    # sort by path length, so that files come first and
+    # can be deleted before the directories that contain the files
     add = sorted(to_add)
     delete = sorted(to_delete)
 
@@ -190,7 +192,7 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
         child = item.split('/')[-1]
         if len(child.split('.')) == 1:
             # TODO:
-            # if a folder has a dot in it, it would not be removed and
+            # if a folder name has a dot in it, it would not be removed and
             # thus synced to the target (solved when using Path instead of
             # strings; then we do not even add dirs to the lib.
             remove.add(item)
