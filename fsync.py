@@ -3,7 +3,6 @@ import argparse
 import logging
 import os
 import sys
-import urllib.request as UL
 from dataclasses import dataclass
 from datetime import datetime
 from ftplib import FTP  # nosec
@@ -29,9 +28,6 @@ class Config:
     local_music_library: str
     target_ip_address: str
     target_music_lib_root_dir: str
-
-
-# TODO: make helpers: path2url & url2path
 
 
 def _usage() -> Tuple[str, str, str]:
@@ -92,11 +88,6 @@ def _login(target: str) -> FTP:
     return ftp
 
 
-def _path_encode(p):
-    p = p.encode('utf-8')
-    return UL.pathname2url(p)
-
-
 def _list_remote(
     config: Config,
     ftp: FTP,
@@ -113,7 +104,7 @@ def _list_remote(
     f = []      # files in current dir
     for name, meta in ftp.mlsd(path=path):
         if meta['type'] == 'file':
-            f.append(_path_encode(name))
+            f.append(name)
 
         if meta['type'] == 'dir':
             dr.append(name)
@@ -144,7 +135,7 @@ def _list_local(music_lib: Path) -> List[str]:
         #       parse target files also into URLs
         absolute_path = p.resolve()
         relative_path = absolute_path.relative_to(music_lib)
-        files.append(_path_encode(str(relative_path)))
+        files.append(str(relative_path))
 
     return files
 
@@ -215,7 +206,7 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
         logging.info('! Nothing to sync')
     else:
         for x in add:
-            p = UL.url2pathname(x)
+            p = x
             if len(p) > 77:
                 msg = f'+ ...{p[len(p)-77:]}'
             else:
@@ -227,7 +218,7 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
         logging.info('! Nothing to remove')
     else:
         for x in delete:
-            p = UL.url2pathname(x)
+            p = x
             if len(p) > 77:
                 msg = f'- ...{p[len(p)-77:]}'
             else:
@@ -248,8 +239,6 @@ def _sync_delete(config: Config, ftp: FTP, lib: List[str]):
     lib = sorted(lib, key=lambda s: len(s), reverse=True)
 
     for item in lib:
-        item = UL.url2pathname(item)
-
         item = f'{config.target_music_lib_root_dir}/{item}'
 
         item_type = ''
@@ -281,7 +270,6 @@ def _sync_add(
     mbytes_transferred: float = 0
 
     for item in lib:
-        item = UL.url2pathname(item)
         path = f'{source_lib}/{item}'
 
         # TODO: ensure lib is sorted - didn't I do this before??
