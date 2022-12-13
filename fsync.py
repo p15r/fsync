@@ -2,6 +2,7 @@
 import argparse
 import logging
 import os
+import sys
 import urllib.request as UL
 from dataclasses import dataclass
 from datetime import datetime
@@ -15,9 +16,12 @@ import yaml
 
 
 CONFIG_FILE = './config.yml'
-
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
+RECURSION_LIMIT = 100
+
+
 logging.basicConfig(level=LOGLEVEL, format='%(message)s')
+sys.setrecursionlimit(RECURSION_LIMIT)
 
 
 @dataclass
