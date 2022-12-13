@@ -1,9 +1,9 @@
 # local music library to sync to target. absolute path.
-local_music_library: /home/pat/music_sync
+local_music_library: /path/to/local/music_library
 
 # target system to sync with local music library
-target_ip_address: 10.0.0.173
+target_ip_address: 192.168.1.xxx
 
 # target music library folder, no trailing slashes
 # TODO: root slash not yet supported
-target_music_lib_root_dir: foobar2000 Music Folder
+target_music_lib_root_dir: path/to/target/music_library
