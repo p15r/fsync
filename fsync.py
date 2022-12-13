@@ -131,17 +131,30 @@ def _list_local(music_lib: Path) -> List[str]:
 
 
 def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
-    local_list: List[str] = []
+    """
+    Converts the lib dict into a list that contains all directories and
+    files of the target system.
+    """
+
+    lib_converted: List[str] = []
 
     if path == config.target_music_lib_root_dir:
         path = ''
 
     for k, v in lib.items():
+        if len(lib) == 1 and len(v) == 0:
+            return lib_converted
+
+        # keys of value `files` store file names, but are not part of paths,
+        # hence ignored
         if k != 'files':
             if not path:
                 path = k
             else:
                 path = f'{path}/{k}'
+
+        if path:
+            lib_converted.append(path)
 
         if isinstance(v, list):
             for item in v:
@@ -151,22 +164,17 @@ def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
                 else:
                     p = f'{path}/{item}'
 
-                local_list.append(p)
-
-        if len(lib) == 1 and len(v) == 0:
-            return local_list
+                lib_converted.append(p)
 
         if isinstance(v, dict):
-            if path != config.target_music_lib_root_dir:
-                local_list.append(path)
-            local_list.extend(_to_list(config, v, path))
+            lib_converted.extend(_to_list(config, v, path))
 
-            # we've done a directory, go back one directory
+            # all files of current directory added, go to parent directory
             path = str(Path(path).parent)
             if path == '.':
                 path = ''
 
-    return local_list
+    return lib_converted
 
 
 def _calculate_delta(local_lib: List[str], target_lib: List[str]):
