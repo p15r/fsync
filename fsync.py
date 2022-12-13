@@ -122,12 +122,10 @@ def _list_remote(config: Config, ftp: FTP, path: str = '',) -> Dict[str, str]:
 def _list_local(music_lib: Path) -> List[str]:
     files = []
 
-    for p in music_lib.rglob('*'):
-        # TODO: instead of string casting, use p.resolve().as_uri() &
-        #       parse target files also into URLs
-        absolute_path = p.resolve()
-        relative_path = absolute_path.relative_to(music_lib)
-        files.append(str(relative_path))
+    for path in music_lib.rglob('*'):
+        abs_path = path.resolve()
+        rel_path = abs_path.relative_to(music_lib)
+        files.append(rel_path.as_posix())
 
     return files
 
