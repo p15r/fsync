@@ -228,32 +228,28 @@ def _calculate_delta(
 def _sync_delete(config: Config, ftp: FTP, lib: List[str]):
     logging.info('Removing files/folders from target...')
 
-    # TODO: my delta compute mechanism doesn't allow me to figure out if
-    #       a folder has been removed, thus I need to iterate over all
-    #       folders, check if they are empty, then delete them
-
     lib = sorted(lib, key=lambda s: len(s), reverse=True)
 
-    for item in lib:
-        item = f'{config.target_music_lib_root_dir}/{item}'
+    for path in lib:
+        path = f'{config.target_music_lib_root_dir}/{path}'
 
-        item_type = ''
-        split = item.split('.')
+        path_type = ''
+        split = path.split('.')
         if len(split) == 1:
-            item_type = 'directory'
+            path_type = 'directory'
         else:
-            item_type = 'file'
+            path_type = 'file'
 
         try:
-            logging.debug(f'Delete {item_type} {item}')
+            logging.info(f'Deleting {path_type} {path}...')
 
-            if item_type == 'file':
-                ftp.delete(item)
+            if path_type == 'file':
+                ftp.delete(path)
 
-            if item_type == 'directory':
-                ftp.rmd(item)
+            if path_type == 'directory':
+                ftp.rmd(path)
         except Exception as e:
-            logging.error(f'Failed to remove {item_type} {item}: {e}')
+            logging.error(f'Failed to remove {path_type} {path}: {e}')
 
 
 def _sync_add(
