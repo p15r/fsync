@@ -26,6 +26,15 @@ PATH_MARKER = '###'
 
 # TODO:
 # - transfer folder and file names with dots in it
+# - create abstract data model for both target &  local lib:
+#   [
+#       {
+#           'type': 'dir',
+#           'rel_p': 'xmas/santa.mp3',
+#           'abs_path': '/home/pat/xmas/santa.mp3'
+#       }
+#   ]
+#   make this a dataclass
 
 logging.basicConfig(level=LOGLEVEL, format='%(message)s')
 sys.setrecursionlimit(RECURSION_LIMIT)
@@ -289,7 +298,6 @@ def _sync_add(
     for item in lib:
         path = f'{source_lib}/{item}'
 
-        # only sync files to target
         if Path(path).is_dir():
             continue
 
