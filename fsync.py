@@ -19,6 +19,10 @@ CONFIG_FILE = './config.yml'
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 RECURSION_LIMIT = 100
 
+# a path marker is appended to a path to track it's type (d: dir, f: file)
+# e.g. '/var/lib/test###f', '/var/log/http###d'
+PATH_MARKER = '###'
+
 
 logging.basicConfig(level=LOGLEVEL, format='%(message)s')
 sys.setrecursionlimit(RECURSION_LIMIT)
@@ -167,11 +171,11 @@ def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
                 else:
                     p = f'{path}/{item}'
 
-                lib_converted.append(p)
+                lib_converted.append(f'{p}{PATH_MARKER}f')
 
         if isinstance(v, dict):
             if path:
-                lib_converted.append(path)
+                lib_converted.append(f'{path}{PATH_MARKER}d')
 
             lib_converted.extend(_to_list(config, v, path))
 
@@ -190,8 +194,11 @@ def _calculate_delta(
     # convert list of Path objects to list of strings
     local_lib_str = [p.as_posix() for p in local_lib]
 
-    to_add = set(local_lib_str) - set(target_lib)
-    to_delete = set(target_lib) - set(local_lib_str)
+    # remove markers from paths
+    target_lib_no_marker = [p.split(PATH_MARKER)[0] for p in target_lib]
+
+    to_add = set(local_lib_str) - set(target_lib_no_marker)
+    to_delete = set(target_lib_no_marker) - set(local_lib_str)
 
     # sort by path length, so that files come first and
     # can be deleted before the directories that contain the files
@@ -222,6 +229,19 @@ def _calculate_delta(
 
         input('Continue?')
 
+    # add back PATH_MARKER
+    add_back = []
+    for path in delete:
+        for orig_path in target_lib:
+            if f'{path}{PATH_MARKER}f' == orig_path:
+                add_back.append((path, orig_path))
+            if f'{path}{PATH_MARKER}d' == orig_path:
+                add_back.append((path, orig_path))
+
+    for item in add_back:
+        delete.remove(item[0])
+        delete.append(item[1])
+
     return add, delete
 
 
@@ -231,25 +251,24 @@ def _sync_delete(config: Config, ftp: FTP, lib: List[str]):
     lib = sorted(lib, key=lambda s: len(s), reverse=True)
 
     for path in lib:
+        path, path_type = path.split(PATH_MARKER)
         path = f'{config.target_music_lib_root_dir}/{path}'
 
-        path_type = ''
-        split = path.split('.')
-        if len(split) == 1:
-            path_type = 'directory'
-        else:
-            path_type = 'file'
-
         try:
-            logging.info(f'Deleting {path_type} {path}...')
+            if len(path) > 77:
+                msg = f'Deleting ...{path[len(path)-77:]}...'
+            else:
+                msg = f'Deleting {path}...'
 
-            if path_type == 'file':
+            logging.info(msg)
+
+            if path_type == 'f':
                 ftp.delete(path)
 
-            if path_type == 'directory':
+            if path_type == 'd':
                 ftp.rmd(path)
         except Exception as e:
-            logging.error(f'Failed to remove {path_type} {path}: {e}')
+            logging.error(f'Failed to remove {path}: {e}')
 
 
 def _sync_add(
