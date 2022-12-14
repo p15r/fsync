@@ -24,6 +24,9 @@ RECURSION_LIMIT = 100
 PATH_MARKER = '###'
 
 
+# TODO:
+# - transfer folder and file names with dots in it
+
 logging.basicConfig(level=LOGLEVEL, format='%(message)s')
 sys.setrecursionlimit(RECURSION_LIMIT)
 
@@ -194,7 +197,7 @@ def _calculate_delta(
     # convert list of Path objects to list of strings
     local_lib_str = [p.as_posix() for p in local_lib]
 
-    # remove markers from paths
+    # remove PATH_MARKERs
     target_lib_no_marker = [p.split(PATH_MARKER)[0] for p in target_lib]
 
     to_add = set(local_lib_str) - set(target_lib_no_marker)
@@ -245,7 +248,7 @@ def _calculate_delta(
     return add, delete
 
 
-def _sync_delete(config: Config, ftp: FTP, lib: List[str]):
+def _sync_delete(config: Config, ftp: FTP, lib: List[str]) -> bool:
     logging.info('Removing files/folders from target...')
 
     lib = sorted(lib, key=lambda s: len(s), reverse=True)
@@ -269,6 +272,9 @@ def _sync_delete(config: Config, ftp: FTP, lib: List[str]):
                 ftp.rmd(path)
         except Exception as e:
             logging.error(f'Failed to remove {path}: {e}')
+            return False
+
+    return True
 
 
 def _sync_add(
@@ -278,16 +284,20 @@ def _sync_add(
     lib: List[str]
 ) -> float:
     logging.info('Syncing to target...')
-    mbytes_transferred: float = 0
+    mbytes_transferred: float = 0.0
 
     for item in lib:
         path = f'{source_lib}/{item}'
 
+        # only sync files to target
+        if Path(path).is_dir():
+            continue
+
         # TODO: ensure lib is sorted - didn't I do this before??
 
         # <DIR>
-        dir = str(Path(item).parent)
-        dirs = dir.split('/')
+        d = str(Path(item).parent)
+        dirs = d.split('/')
 
         tmp = ''
         for d in dirs:
@@ -369,6 +379,7 @@ def main() -> int:
     add, remove = _calculate_delta(local_lib, target_lib_converted)
 
     if remove:
+        # check return value
         _sync_delete(config, ftp, remove)
 
     mbytes_transferred: float = 0.0
