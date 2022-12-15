@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Tuple
+from typing import Union
 
 import yaml
 
@@ -19,6 +20,22 @@ CONFIG_FILE = './config.yml'
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 RECURSION_LIMIT = 100
 
+# a path marker is appended to a path to track it's type (d: dir, f: file)
+# e.g. '/var/lib/test###f', '/var/log/http###d'
+PATH_MARKER = '###'
+
+
+# TODO:
+# - transfer folder and file names with dots in it
+# - create abstract data model for both target &  local lib:
+#   [
+#       {
+#           'type': 'dir',
+#           'rel_p': 'xmas/santa.mp3',
+#           'abs_path': '/home/pat/xmas/santa.mp3'
+#       }
+#   ]
+#   make this a dataclass
 
 logging.basicConfig(level=LOGLEVEL, format='%(message)s')
 sys.setrecursionlimit(RECURSION_LIMIT)
@@ -73,20 +90,24 @@ def _load_config() -> Config:
 
 
 def _login(target: str) -> FTP:
-    ftp = FTP(target)   # nosec
-    ftp.encoding = 'utf-8'
-    ftp.login()
-    ftp.sendcmd('OPTS UTF8 ON')
+    ftp_session = FTP(target)   # nosec
+    ftp_session.encoding = 'utf-8'
+    ftp_session.login()
+    ftp_session.sendcmd('OPTS UTF8 ON')
 
-    welcome = ftp.getwelcome()
+    welcome = ftp_session.getwelcome()
 
     if welcome:
         logging.info(f'Greeting from target: {welcome}')
 
-    return ftp
+    return ftp_session
 
 
-def _list_remote(config: Config, ftp: FTP, path: str = '',) -> Dict[str, str]:
+def _list_remote(
+    config: Config,
+    ftp_session: FTP,
+    path: str = ''
+) -> Dict[str, str]:
     target_db: Dict = {}
 
     if not path:
@@ -94,7 +115,7 @@ def _list_remote(config: Config, ftp: FTP, path: str = '',) -> Dict[str, str]:
 
     subdirs = []
     files = []
-    for name, meta in ftp.mlsd(path=path):
+    for name, meta in ftp_session.mlsd(path=path):
         if meta['type'] == 'file':
             files.append(name)
 
@@ -112,20 +133,26 @@ def _list_remote(config: Config, ftp: FTP, path: str = '',) -> Dict[str, str]:
 
         target_db[sd] = _list_remote(
             config,
-            ftp,
+            ftp_session,
             f'{path}/{sd}',
         )
 
     return target_db
 
 
-def _list_local(music_lib: Path) -> List[str]:
+def _list_local(music_lib: Path) -> List[Path]:
     files = []
 
     for path in music_lib.rglob('*'):
         abs_path = path.resolve()
+
+        if abs_path.is_dir():
+            # empty folders do not get synced to target system
+            if not os.listdir(abs_path):
+                continue
+
         rel_path = abs_path.relative_to(music_lib)
-        files.append(rel_path.as_posix())
+        files.append(rel_path)
 
     return files
 
@@ -153,9 +180,6 @@ def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
             else:
                 path = f'{path}/{k}'
 
-        if path:
-            lib_converted.append(path)
-
         if isinstance(v, list):
             for item in v:
                 if path == '':
@@ -164,9 +188,12 @@ def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
                 else:
                     p = f'{path}/{item}'
 
-                lib_converted.append(p)
+                lib_converted.append(f'{p}{PATH_MARKER}f')
 
         if isinstance(v, dict):
+            if path:
+                lib_converted.append(f'{path}{PATH_MARKER}d')
+
             lib_converted.extend(_to_list(config, v, path))
 
             # all files of current directory added, go to parent directory
@@ -177,36 +204,29 @@ def _to_list(config: Config, lib: Dict[str, str], path: str = '') -> List[str]:
     return lib_converted
 
 
-def _calculate_delta(local_lib: List[str], target_lib: List[str]):
-    to_add = set(local_lib) - set(target_lib)
-    to_delete = set(target_lib) - set(local_lib)
+def _calculate_delta(
+    local_lib: List[Path],
+    target_lib: List[str]
+) -> Tuple[List[str], List[str]]:
+    # convert list of Path objects to list of strings
+    local_lib_str = [p.as_posix() for p in local_lib]
+
+    # remove PATH_MARKERs
+    target_lib_no_marker = [p.split(PATH_MARKER)[0] for p in target_lib]
+
+    to_add = set(local_lib_str) - set(target_lib_no_marker)
+    to_delete = set(target_lib_no_marker) - set(local_lib_str)
 
     # sort by path length, so that files come first and
     # can be deleted before the directories that contain the files
     add = sorted(to_add)
     delete = sorted(to_delete)
 
-    # <remove folders>
-    remove = set()
-    for item in add:
-        child = item.split('/')[-1]
-        if len(child.split('.')) == 1:
-            # TODO:
-            # if a folder name has a dot in it, it would not be removed and
-            # thus synced to the target (solved when using Path instead of
-            # strings; then we do not even add dirs to the lib.
-            remove.add(item)
-
-    for item in remove:
-        add.remove(item)
-    # </remove folders>
-
     logging.info('Files to sync to target:')
     if len(add) == 0:
         logging.info('! Nothing to sync')
     else:
-        for x in add:
-            p = x
+        for p in add:
             if len(p) > 77:
                 msg = f'+ ...{p[len(p)-77:]}'
             else:
@@ -217,87 +237,100 @@ def _calculate_delta(local_lib: List[str], target_lib: List[str]):
     if len(delete) == 0:
         logging.info('! Nothing to remove')
     else:
-        for x in delete:
-            p = x
+        for p in delete:
             if len(p) > 77:
                 msg = f'- ...{p[len(p)-77:]}'
             else:
                 msg = f'- {p}'
             logging.info(msg)
+
         input('Continue?')
+
+    # add back PATH_MARKER
+    add_back = []
+    for path in delete:
+        for orig_path in target_lib:
+            if f'{path}{PATH_MARKER}f' == orig_path:
+                add_back.append((path, orig_path))
+            if f'{path}{PATH_MARKER}d' == orig_path:
+                add_back.append((path, orig_path))
+
+    for item in add_back:
+        delete.remove(item[0])
+        delete.append(item[1])
 
     return add, delete
 
 
-def _sync_delete(config: Config, ftp: FTP, lib: List[str]):
+def _sync_delete(config: Config, ftp_session: FTP, lib: List[str]) -> bool:
     logging.info('Removing files/folders from target...')
-
-    # TODO: my delta compute mechanism doesn't allow me to figure out if
-    #       a folder has been removed, thus I need to iterate over all
-    #       folders, check if they are empty, then delete them
 
     lib = sorted(lib, key=lambda s: len(s), reverse=True)
 
-    for item in lib:
-        item = f'{config.target_music_lib_root_dir}/{item}'
-
-        item_type = ''
-        split = item.split('.')
-        if len(split) == 1:
-            item_type = 'directory'
-        else:
-            item_type = 'file'
+    for path in lib:
+        path, path_type = path.split(PATH_MARKER)
+        path = f'{config.target_music_lib_root_dir}/{path}'
 
         try:
-            logging.debug(f'Delete {item_type} {item}')
+            if len(path) > 77:
+                msg = f'Deleting ...{path[len(path)-77:]}...'
+            else:
+                msg = f'Deleting {path}...'
 
-            if item_type == 'file':
-                ftp.delete(item)
+            logging.info(msg)
 
-            if item_type == 'directory':
-                ftp.rmd(item)
+            if path_type == 'f':
+                ftp_session.delete(path)
+
+            if path_type == 'd':
+                ftp_session.rmd(path)
         except Exception as e:
-            logging.error(f'Failed to remove {item_type} {item}: {e}')
+            logging.error(f'Failed to remove {path}: {e}')
+            return False
+
+    return True
+
+
+def _sync_add_dir(config: Config, ftp_session: FTP, path: str) -> bool:
+    parent = str(Path(path).parent)
+    parents = parent.split('/')
+
+    if parents == ['.']:
+        # we're in root dir, no need to create
+        return True
+
+    abs_path = f'{config.target_music_lib_root_dir}'
+    for parent in parents:
+        abs_path = f'{abs_path}/{parent}'
+        logging.debug(f'Creating dir "{abs_path}"')
+        res_path = ftp_session.mkd(abs_path)
+
+        if not res_path:
+            logging.error(f'Failed to create directory {res_path}')
+            return False
+
+    return True
 
 
 def _sync_add(
     config: Config,
-    ftp: FTP,
+    ftp_session: FTP,
     source_lib: str,
     lib: List[str]
-) -> float:
+) -> Union[float, bool]:
     logging.info('Syncing to target...')
-    mbytes_transferred: float = 0
+    mbytes_transferred: float = 0.0
 
     for item in lib:
         path = f'{source_lib}/{item}'
 
-        # TODO: ensure lib is sorted - didn't I do this before??
+        if Path(path).is_dir():
+            continue
 
-        # <DIR>
-        dir = str(Path(item).parent)
-        dirs = dir.split('/')
+        if not _sync_add_dir(config, ftp_session, item):
+            logging.error('Failed to create directories on target.')
+            return False
 
-        tmp = ''
-        for d in dirs:
-            if d == '.':
-                # TODO: why do I get a dot? Can I remove it before I get here?
-                continue
-
-            if not tmp:
-                tmp = f'{config.target_music_lib_root_dir}/{d}'
-            else:
-                tmp = f'{tmp}/{d}'
-
-            if tmp == config.target_music_lib_root_dir:
-                # TODO: can this be done more elegant?
-                continue
-
-            logging.debug(f'Creating dir "{tmp}"')
-            ftp.mkd(tmp)
-        # </DIR>
-
-        # TODO: stat: file x of total (progress percentage)
         size = Path(path).stat().st_size / (1 << 20)
         size_r = round(size, 2)
         with open(path, 'rb') as f_handle:
@@ -306,10 +339,14 @@ def _sync_add(
             else:
                 msg = f'Uploading {item} ({size_r} MB)...'
             logging.info(msg)
-            ftp.storbinary(
-                f'STOR {config.target_music_lib_root_dir}/{item}',
-                f_handle
-            )
+            try:
+                ftp_session.storbinary(
+                    f'STOR {config.target_music_lib_root_dir}/{item}',
+                    f_handle
+                )
+            except Exception as e:
+                logging.error(f'Failed to upload {item}: {e}')
+                return False
 
         mbytes_transferred += size
 
@@ -338,39 +375,39 @@ def main() -> int:
         input('Local library is empty. Delete everything on target?')
 
     logging.info('Authenticating...')
-    ftp = _login(config.target_ip_address)
+    ftp_session = _login(config.target_ip_address)
 
     logging.info('Get target library...')
-    target_lib = _list_remote(config, ftp)
+    target_lib = _list_remote(config, ftp_session)
     logging.debug(f'Files in target media lib: {target_lib}')
 
-    # TODO: remove empty target once target_lib has been refactored
-    #       and doesn't break _to_list() if empty
-    empty_target = False
     if not target_lib:
         logging.info('No files found on target...')
-        empty_target = True
 
     target_lib_converted = []
-    if not empty_target:
-        target_lib_converted = _to_list(config, target_lib)
+    target_lib_converted = _to_list(config, target_lib)
 
     add, remove = _calculate_delta(local_lib, target_lib_converted)
 
     if remove:
-        _sync_delete(config, ftp, remove)
+        if not _sync_delete(config, ftp_session, remove):
+            logging.error('Failed to remove files on target.')
+            return 1
 
     mbytes_transferred: float = 0.0
     if add:
         mbytes_transferred = _sync_add(
             config,
-            ftp,
+            ftp_session,
             config.local_music_library,
             add
         )
 
-    # TODO: rename ftp to ftp_session
-    ftp.quit()
+        if not mbytes_transferred:
+            logging.error('Failed to sync local lib to target')
+            return 1
+
+    ftp_session.quit()
 
     end_sync = datetime.now()
     duration = end_sync - start_sync
