@@ -286,6 +286,23 @@ def _sync_delete(config: Config, ftp: FTP, lib: List[str]) -> bool:
     return True
 
 
+def _sync_add_dir(config: Config, ftp: FTP, path: str) -> bool:
+    parent = str(Path(path).parent)
+    parents = parent.split('/')
+
+    abs_path = f'{config.target_music_lib_root_dir}'
+    for parent in parents:
+        abs_path = f'{abs_path}/{parent}'
+        res_path = ftp.mkd(abs_path)
+        logging.debug(f'Created dir "{res_path}"')
+
+        if not res_path:
+            logging.error(f'Failed to create directory {res_path}')
+            return False
+
+    return True
+
+
 def _sync_add(
     config: Config,
     ftp: FTP,
@@ -301,30 +318,9 @@ def _sync_add(
         if Path(path).is_dir():
             continue
 
-        # TODO: ensure lib is sorted - didn't I do this before??
-
-        # <DIR>
-        d = str(Path(item).parent)
-        dirs = d.split('/')
-
-        tmp = ''
-        for d in dirs:
-            if d == '.':
-                # TODO: why do I get a dot? Can I remove it before I get here?
-                continue
-
-            if not tmp:
-                tmp = f'{config.target_music_lib_root_dir}/{d}'
-            else:
-                tmp = f'{tmp}/{d}'
-
-            if tmp == config.target_music_lib_root_dir:
-                # TODO: can this be done more elegant?
-                continue
-
-            logging.debug(f'Creating dir "{tmp}"')
-            ftp.mkd(tmp)
-        # </DIR>
+        if not _sync_add_dir(config, ftp, item):
+            logging.error('Failed to create directories on target.')
+            return 0.0
 
         # TODO: stat: file x of total (progress percentage)
         size = Path(path).stat().st_size / (1 << 20)
