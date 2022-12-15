@@ -395,6 +395,8 @@ def main() -> int:
             add
         )
 
+    # TODO: check if _sync_add() returned 0.0 bytes (error)
+
     # TODO: rename ftp to ftp_session
     ftp.quit()
 
