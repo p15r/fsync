@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Tuple
+from typing import Union
 
 import yaml
 
@@ -312,7 +313,7 @@ def _sync_add(
     ftp: FTP,
     source_lib: str,
     lib: List[str]
-) -> float:
+) -> Union[float, bool]:
     logging.info('Syncing to target...')
     mbytes_transferred: float = 0.0
 
@@ -324,9 +325,8 @@ def _sync_add(
 
         if not _sync_add_dir(config, ftp, item):
             logging.error('Failed to create directories on target.')
-            return 0.0
+            return False
 
-        # TODO: stat: file x of total (progress percentage)
         size = Path(path).stat().st_size / (1 << 20)
         size_r = round(size, 2)
         with open(path, 'rb') as f_handle:
@@ -335,10 +335,14 @@ def _sync_add(
             else:
                 msg = f'Uploading {item} ({size_r} MB)...'
             logging.info(msg)
-            ftp.storbinary(
-                f'STOR {config.target_music_lib_root_dir}/{item}',
-                f_handle
-            )
+            try:
+                ftp.storbinary(
+                    f'STOR {config.target_music_lib_root_dir}/{item}',
+                    f_handle
+                )
+            except Exception as e:
+                logging.error(f'Failed to upload {item}: {e}')
+                return False
 
         mbytes_transferred += size
 
@@ -387,8 +391,9 @@ def main() -> int:
     add, remove = _calculate_delta(local_lib, target_lib_converted)
 
     if remove:
-        # check return value
-        _sync_delete(config, ftp, remove)
+        if not _sync_delete(config, ftp, remove):
+            logging.error('Failed to remove files on target.')
+            return 1
 
     mbytes_transferred: float = 0.0
     if add:
@@ -399,7 +404,9 @@ def main() -> int:
             add
         )
 
-    # TODO: check if _sync_add() returned 0.0 bytes (error)
+        if not mbytes_transferred:
+            logging.error('Failed to sync local lib to target')
+            return 1
 
     # TODO: rename ftp to ftp_session
     ftp.quit()
