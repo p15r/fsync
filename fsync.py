@@ -333,6 +333,11 @@ def _sync_add(
 
         size = Path(path).stat().st_size / (1 << 20)
         size_r = round(size, 2)
+
+        if size == 0:
+            # account for empty file
+            size = 0.001
+
         with open(path, 'rb') as f_handle:
             if len(item) > 77:
                 msg = f'Uploading ...{item[len(item)-77:]} ({size_r} MB)...'
