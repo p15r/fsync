@@ -290,11 +290,15 @@ def _sync_add_dir(config: Config, ftp: FTP, path: str) -> bool:
     parent = str(Path(path).parent)
     parents = parent.split('/')
 
+    if parents == ['.']:
+        # we're in root dir, no need to create
+        return True
+
     abs_path = f'{config.target_music_lib_root_dir}'
     for parent in parents:
         abs_path = f'{abs_path}/{parent}'
+        logging.debug(f'Creating dir "{abs_path}"')
         res_path = ftp.mkd(abs_path)
-        logging.debug(f'Created dir "{res_path}"')
 
         if not res_path:
             logging.error(f'Failed to create directory {res_path}')
