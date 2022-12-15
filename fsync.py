@@ -90,20 +90,24 @@ def _load_config() -> Config:
 
 
 def _login(target: str) -> FTP:
-    ftp = FTP(target)   # nosec
-    ftp.encoding = 'utf-8'
-    ftp.login()
-    ftp.sendcmd('OPTS UTF8 ON')
+    ftp_session = FTP(target)   # nosec
+    ftp_session.encoding = 'utf-8'
+    ftp_session.login()
+    ftp_session.sendcmd('OPTS UTF8 ON')
 
-    welcome = ftp.getwelcome()
+    welcome = ftp_session.getwelcome()
 
     if welcome:
         logging.info(f'Greeting from target: {welcome}')
 
-    return ftp
+    return ftp_session
 
 
-def _list_remote(config: Config, ftp: FTP, path: str = '',) -> Dict[str, str]:
+def _list_remote(
+    config: Config,
+    ftp_session: FTP,
+    path: str = ''
+) -> Dict[str, str]:
     target_db: Dict = {}
 
     if not path:
@@ -111,7 +115,7 @@ def _list_remote(config: Config, ftp: FTP, path: str = '',) -> Dict[str, str]:
 
     subdirs = []
     files = []
-    for name, meta in ftp.mlsd(path=path):
+    for name, meta in ftp_session.mlsd(path=path):
         if meta['type'] == 'file':
             files.append(name)
 
@@ -129,7 +133,7 @@ def _list_remote(config: Config, ftp: FTP, path: str = '',) -> Dict[str, str]:
 
         target_db[sd] = _list_remote(
             config,
-            ftp,
+            ftp_session,
             f'{path}/{sd}',
         )
 
@@ -258,7 +262,7 @@ def _calculate_delta(
     return add, delete
 
 
-def _sync_delete(config: Config, ftp: FTP, lib: List[str]) -> bool:
+def _sync_delete(config: Config, ftp_session: FTP, lib: List[str]) -> bool:
     logging.info('Removing files/folders from target...')
 
     lib = sorted(lib, key=lambda s: len(s), reverse=True)
@@ -276,10 +280,10 @@ def _sync_delete(config: Config, ftp: FTP, lib: List[str]) -> bool:
             logging.info(msg)
 
             if path_type == 'f':
-                ftp.delete(path)
+                ftp_session.delete(path)
 
             if path_type == 'd':
-                ftp.rmd(path)
+                ftp_session.rmd(path)
         except Exception as e:
             logging.error(f'Failed to remove {path}: {e}')
             return False
@@ -287,7 +291,7 @@ def _sync_delete(config: Config, ftp: FTP, lib: List[str]) -> bool:
     return True
 
 
-def _sync_add_dir(config: Config, ftp: FTP, path: str) -> bool:
+def _sync_add_dir(config: Config, ftp_session: FTP, path: str) -> bool:
     parent = str(Path(path).parent)
     parents = parent.split('/')
 
@@ -299,7 +303,7 @@ def _sync_add_dir(config: Config, ftp: FTP, path: str) -> bool:
     for parent in parents:
         abs_path = f'{abs_path}/{parent}'
         logging.debug(f'Creating dir "{abs_path}"')
-        res_path = ftp.mkd(abs_path)
+        res_path = ftp_session.mkd(abs_path)
 
         if not res_path:
             logging.error(f'Failed to create directory {res_path}')
@@ -310,7 +314,7 @@ def _sync_add_dir(config: Config, ftp: FTP, path: str) -> bool:
 
 def _sync_add(
     config: Config,
-    ftp: FTP,
+    ftp_session: FTP,
     source_lib: str,
     lib: List[str]
 ) -> Union[float, bool]:
@@ -323,7 +327,7 @@ def _sync_add(
         if Path(path).is_dir():
             continue
 
-        if not _sync_add_dir(config, ftp, item):
+        if not _sync_add_dir(config, ftp_session, item):
             logging.error('Failed to create directories on target.')
             return False
 
@@ -336,7 +340,7 @@ def _sync_add(
                 msg = f'Uploading {item} ({size_r} MB)...'
             logging.info(msg)
             try:
-                ftp.storbinary(
+                ftp_session.storbinary(
                     f'STOR {config.target_music_lib_root_dir}/{item}',
                     f_handle
                 )
@@ -371,10 +375,10 @@ def main() -> int:
         input('Local library is empty. Delete everything on target?')
 
     logging.info('Authenticating...')
-    ftp = _login(config.target_ip_address)
+    ftp_session = _login(config.target_ip_address)
 
     logging.info('Get target library...')
-    target_lib = _list_remote(config, ftp)
+    target_lib = _list_remote(config, ftp_session)
     logging.debug(f'Files in target media lib: {target_lib}')
 
     if not target_lib:
@@ -386,7 +390,7 @@ def main() -> int:
     add, remove = _calculate_delta(local_lib, target_lib_converted)
 
     if remove:
-        if not _sync_delete(config, ftp, remove):
+        if not _sync_delete(config, ftp_session, remove):
             logging.error('Failed to remove files on target.')
             return 1
 
@@ -394,7 +398,7 @@ def main() -> int:
     if add:
         mbytes_transferred = _sync_add(
             config,
-            ftp,
+            ftp_session,
             config.local_music_library,
             add
         )
@@ -403,8 +407,7 @@ def main() -> int:
             logging.error('Failed to sync local lib to target')
             return 1
 
-    # TODO: rename ftp to ftp_session
-    ftp.quit()
+    ftp_session.quit()
 
     end_sync = datetime.now()
     duration = end_sync - start_sync
