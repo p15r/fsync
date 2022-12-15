@@ -1,11 +1,11 @@
 ---
 
-# local music library to sync to target. absolute path.
-local_music_library: /path/to/local/music_library
+# local directory to sync to target. absolute path.
+source_directory: /path/to/local/directory
 
-# target system to sync with local music library
+# target system to sync
 target_ip_address: 192.168.1.xxx
 
-# target music library folder, no trailing slashes
+# target directory, no trailing slashes
 # TODO: root slash not yet supported
-target_music_lib_root_dir: path/to/target/music_library
+target_directory: path/to/target/directory
