@@ -52,6 +52,9 @@ class FSyncPath:
     # absolute path
     abs_path: str = field(compare=False)
 
+    # file size (bytes)
+    size: int = field(compare=True)
+
     def __hash__(self):
         return hash(self.rel_path)
 
@@ -85,6 +88,12 @@ def _usage() -> Tuple[str, str, str]:
     args = parser.parse_args()
 
     return args.source_dir, args.target, args.target_dir
+
+
+def bytes_to_mbytes(b: int) -> int:
+    size = b / (1 << 20)
+    size_r = round(size, 2)
+    return size_r
 
 
 def _load_config() -> Config:
@@ -128,10 +137,10 @@ def _list_remote(
     files = []
     for name, meta in ftp_session.mlsd(path=path):
         if meta['type'] == 'file':
-            files.append(FSyncPath(PathType.file, name, ''))
+            files.append(FSyncPath(PathType.file, name, '', int(meta['size'])))
 
         if meta['type'] == 'dir':
-            subdirs.append(FSyncPath(PathType.directory, name, ''))
+            subdirs.append(FSyncPath(PathType.directory, name, '', 4096))
 
         target_paths['files'] = files
 
@@ -166,7 +175,23 @@ def _list_source(source_directory: Path) -> List[FSyncPath]:
                 continue
 
         rel_path = abs_path.relative_to(source_directory)
-        p = FSyncPath(PathType.file, rel_path.as_posix(), abs_path.as_posix())
+        size = Path(abs_path).stat().st_size
+
+        if abs_path.is_dir():
+            p = FSyncPath(
+                PathType.directory,
+                rel_path.as_posix(),
+                abs_path.as_posix(),
+                4096
+            )
+        else:
+            p = FSyncPath(
+                PathType.file,
+                rel_path.as_posix(),
+                abs_path.as_posix(),
+                int(size)
+            )
+
         files.append(p)
 
     return files
@@ -212,7 +237,7 @@ def _to_list(
         if isinstance(v, dict):
             if path:
                 target_paths_converted.append(
-                    FSyncPath(PathType.directory, path, '')
+                    FSyncPath(PathType.directory, path, '', 4096)
                 )
 
             target_paths_converted.extend(_to_list(config, v, path))
@@ -241,9 +266,12 @@ def _calculate_delta(
     else:
         for p in add:
             if len(p.rel_path) > 77:
-                msg = f'+ ...{p.rel_path[len(p.rel_path)-77:]}'
+                msg = (
+                    f'+ ...{p.rel_path[len(p.rel_path)-77:]} '
+                    f'({bytes_to_mbytes(p.size)} MB)'
+                )
             else:
-                msg = f'+ {p.rel_path}'
+                msg = f'+ {p.rel_path} ({bytes_to_mbytes(p.size)} MB)'
             logging.info(msg)
 
     logging.info('Files/directories to remove on target:')
@@ -252,9 +280,12 @@ def _calculate_delta(
     else:
         for p in delete:
             if len(p.rel_path) > 77:
-                msg = f'- ...{p.rel_path[len(p.rel_path)-77:]}'
+                msg = (
+                    f'- ...{p.rel_path[len(p.rel_path)-77:]} '
+                    f'({bytes_to_mbytes(p.size)} MB)'
+                )
             else:
-                msg = f'- {p.rel_path}'
+                msg = f'- {p.rel_path} ({bytes_to_mbytes(p.size)} MB)'
             logging.info(msg)
 
         input('Continue?')
@@ -336,8 +367,8 @@ def _sync_add(
             logging.error('Failed to create directories on target.')
             return False
 
-        size = Path(path).stat().st_size / (1 << 20)
-        size_r = round(size, 2)
+        size = Path(path).stat().st_size
+        size_r = bytes_to_mbytes(size)
 
         if size == 0:
             # account for empty file
