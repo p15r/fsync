@@ -90,7 +90,7 @@ def _usage() -> Tuple[str, str, str]:
     return args.source_dir, args.target, args.target_dir
 
 
-def bytes_to_mbytes(b: int) -> int:
+def bytes_to_mbytes(b: float) -> float:
     size = b / (1 << 20)
     size_r = round(size, 2)
     return size_r
@@ -355,7 +355,7 @@ def _sync_add(
     paths: List[FSyncPath]
 ) -> Union[float, bool]:
     logging.info('Syncing to target...')
-    mbytes_transferred: float = 0.0
+    bytes_transferred: float = 0.0
 
     for item in paths:
         path = f'{source_directory}/{item.rel_path}'
@@ -367,7 +367,7 @@ def _sync_add(
             logging.error('Failed to create directories on target.')
             return False
 
-        size = Path(path).stat().st_size
+        size = float(Path(path).stat().st_size)
         size_r = bytes_to_mbytes(size)
 
         if size == 0:
@@ -392,9 +392,9 @@ def _sync_add(
                 logging.error(f'Failed to upload {item.rel_path}: {e}')
                 return False
 
-        mbytes_transferred += size
+        bytes_transferred += size
 
-    return mbytes_transferred
+    return bytes_transferred
 
 
 def main() -> int:
@@ -440,16 +440,16 @@ def main() -> int:
             logging.error('Failed to remove files on target.')
             return 1
 
-    mbytes_transferred: float = 0.0
+    bytes_transferred: float = 0.0
     if add:
-        mbytes_transferred = _sync_add(
+        bytes_transferred = _sync_add(
             config,
             ftp_session,
             config.source_directory,
             add
         )
 
-        if not mbytes_transferred:
+        if not bytes_transferred:
             logging.error('Failed to sync source directory to target')
             return 1
 
@@ -458,7 +458,8 @@ def main() -> int:
     end_sync = datetime.now()
     duration = end_sync - start_sync
     logging.info(
-        f'Sync took {duration} ({round(mbytes_transferred, 2)} MB transferred)'
+        f'Sync took {duration} ({bytes_to_mbytes(bytes_transferred)} '
+        'MB transferred)'
     )
 
     return 0
