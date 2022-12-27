@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
+import json
 import logging
 import os
 import sys
@@ -15,12 +16,10 @@ from typing import List
 from typing import Tuple
 from typing import Union
 
-import yaml
 
-
-CONFIG_FILE = './config.yml'
+CONFIG_FILE = './config.json'
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
-RECURSION_LIMIT = 100
+RECURSION_LIMIT = 200
 
 
 logging.basicConfig(level=LOGLEVEL, format='%(message)s')
@@ -98,7 +97,7 @@ def bytes_to_mbytes(b: float) -> float:
 
 def _load_config() -> Config:
     with open(CONFIG_FILE, 'r') as f_handle:
-        cnt = yaml.safe_load(f_handle)
+        cnt = json.load(f_handle)
 
     # `**cnt` unpacks dict into list of args for dataclass
     config = Config(**cnt)
