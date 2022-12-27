@@ -24,7 +24,7 @@ repos:
     hooks:
     -   id: codespell
 -   repo: https://github.com/p15r/pre-commit-hooks.git
-    rev: v0.3.0
+    rev: v0.3.1
     hooks:
     -   id: markdown-detect-nonref-links
 -   repo: https://github.com/pre-commit/pre-commit-hooks
@@ -42,7 +42,7 @@ repos:
     -   id: mypy
         args: ["--install-types", "--non-interactive", "--ignore-missing-imports"]
 -   repo: https://github.com/pre-commit/pygrep-hooks
-    rev: v1.9.0
+    rev: v1.10.0
     hooks:
     -   id: python-use-type-annotations
     -   id: python-no-eval

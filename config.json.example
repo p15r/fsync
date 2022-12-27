@@ -1,0 +1,12 @@
+# Remove comments when setting up config file!
+
+{
+  # local directory to sync to target. absolute path.
+  "source_directory": "/path/to/local/directory",
+
+  # target system to sync
+  "target_ip_address": "192.168.1.xxx",
+
+  # target directory. absolute path. no trailing slashes
+  "target_directory": "/path/to/target/directory"
+}

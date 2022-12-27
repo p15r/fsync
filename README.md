@@ -1,3 +1,5 @@
+![gh action status][ghactiontesting]
+
 # Readme
 `fsync` is a script that behaves like `rsync -a` over FTP.
 
@@ -11,3 +13,5 @@ This script actually uses plain FTP - no encryption support. This is insecure.
 
 I created `fsync` to sync my music library from my computer to my mobile
 device over a local network.
+
+[ghactiontesting]: https://github.com/p15r/fsync/actions/workflows/tests.yml/badge.svg
