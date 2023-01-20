@@ -1,0 +1,430 @@
+import fsync
+import tests
+
+"""
+Sample dataset relationships:
+
+calculate_delta_expected_add_dataset == source_medium_sample_dataset - \
+    target_small_sample_dataset_converted
+
+calculate_delta_expected_remove_dataset == \
+    target_small_sample_dataset_converted - source_medium_sample_dataset
+"""
+
+
+# small data set on target, reported by `ftp_session.mlsd()`
+target_small_sample_dataset = {
+    'files': [
+        fsync.FSyncPath(
+            path_type=fsync.PathType.file,
+            rel_path='some_script.sh',
+            abs_path='',
+            size=136,
+        )
+    ],
+    'some_dir': {
+        'files': [
+            fsync.FSyncPath(
+                path_type=fsync.PathType.file,
+                rel_path='file1.bin',
+                abs_path='',
+                size=3623374,
+            ),
+            fsync.FSyncPath(
+                path_type=fsync.PathType.file,
+                rel_path='file2.bin',
+                abs_path='',
+                size=2773582,
+            ),
+            fsync.FSyncPath(
+                path_type=fsync.PathType.file,
+                rel_path='file3.bin',
+                abs_path='',
+                size=3072718,
+            ),
+            fsync.FSyncPath(
+                path_type=fsync.PathType.file,
+                rel_path='file4.bin',
+                abs_path='',
+                size=4513102,
+            ),
+            fsync.FSyncPath(
+                path_type=fsync.PathType.file,
+                rel_path='file5.bin',
+                abs_path='',
+                size=57601005,
+            ),
+        ]
+    },
+}
+
+# small data set from target, converted using `_to_list()`
+target_small_sample_dataset_converted = [
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file, rel_path='some_script.sh', abs_path='',
+        size=136
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.directory, rel_path='some_dir', abs_path='',
+        size=4096
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file1.bin',
+        abs_path='',
+        size=3623374,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file2.bin',
+        abs_path='',
+        size=2773582,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file3.bin',
+        abs_path='',
+        size=3072718,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file4.bin',
+        abs_path='',
+        size=4513102,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file5.bin',
+        abs_path='',
+        size=57601005,
+    ),
+]
+
+# expected delta data set to add to target with empty source
+calculate_delta_add_small_sample_dataset = [
+    fsync.FSyncPath(
+        path_type=fsync.PathType.directory,
+        rel_path='some_dir',
+        abs_path=f'{tests.source_root_dir}/{tests.small_sample}/some_dir',
+        size=4096,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file1.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_dir/file1.bin'
+        ),
+        size=3623374,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file2.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_dir/file2.bin'
+        ),
+        size=2773582,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file3.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_dir/file3.bin'
+        ),
+        size=3072718,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file4.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_dir/file4.bin'
+        ),
+        size=4513102,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file5.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_dir/file5.bin'
+        ),
+        size=57601005,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_script.sh',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_script.sh'
+        ),
+        size=136,
+    ),
+]
+
+# expected delta data set to remove from target with empty source
+calculate_delta_remove_small_sample_dataset = [
+    fsync.FSyncPath(
+        path_type=fsync.PathType.directory, rel_path='some_dir', abs_path='',
+        size=4096
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file1.bin',
+        abs_path='',
+        size=3623374,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file2.bin',
+        abs_path='',
+        size=2773582,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file3.bin',
+        abs_path='',
+        size=3072718,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file4.bin',
+        abs_path='',
+        size=4513102,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file5.bin',
+        abs_path='',
+        size=57601005,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file, rel_path='some_script.sh', abs_path='',
+        size=136
+    ),
+]
+
+# medium data set on source
+source_medium_sample_dataset = [
+    fsync.FSyncPath(
+        path_type=fsync.PathType.directory,
+        rel_path='some_dir2',
+        abs_path=f'{tests.source_root_dir}/medium_sample_dataset/some_dir2',
+        size=4096,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.directory,
+        rel_path='some_dir',
+        abs_path=f'{tests.source_root_dir}/medium_sample_dataset/some_dir',
+        size=4096,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/a_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset/'
+            'some_dir2/a_file.bin'
+        ),
+        size=3103341,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/s_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir2/s_file.bin'
+        ),
+        size=5111882,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/ab_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir2/ab_file.bin'
+        ),
+        size=3512782,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/j_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir2/j_file.bin'
+        ),
+        size=9674733,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/d_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir2/d_file.bin'
+        ),
+        size=3220461,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file4.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir/file4.bin'
+        ),
+        size=4513102,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file5.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir/file5.bin'
+        ),
+        size=57601005,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file1.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir/file1.bin'
+        ),
+        size=3623374,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file3.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir/file3.bin'
+        ),
+        size=3072718,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file2.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir/file2.bin'
+        ),
+        size=2773582,
+    ),
+]
+
+# expected delta data set to add to target with medium source
+calculate_delta_expected_add_dataset = [
+    fsync.FSyncPath(
+        path_type=fsync.PathType.directory,
+        rel_path='some_dir2',
+        abs_path=f'{tests.source_root_dir}/medium_sample_dataset/some_dir2',
+        size=4096,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/a_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir2/a_file.bin'
+        ),
+        size=3103341,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/ab_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir2/ab_file.bin'
+        ),
+        size=3512782,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/d_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir2/d_file.bin'
+        ),
+        size=3220461,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/j_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir2/j_file.bin'
+        ),
+        size=9674733,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir2/s_file.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/medium_sample_dataset'
+            '/some_dir2/s_file.bin'
+        ),
+        size=5111882,
+    ),
+]
+
+# expected delta data set to remove from target with medium source
+calculate_delta_expected_remove_dataset = [
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file, rel_path='some_script.sh', abs_path='',
+        size=136
+    )
+]
+
+# small source data set to sync to target
+sync_add_small_dataset = [
+    fsync.FSyncPath(
+        path_type=fsync.PathType.directory,
+        rel_path='some_dir',
+        abs_path=f'{tests.source_root_dir}/{tests.small_sample}/some_dir',
+        size=4096,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file1.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}'
+            '/some_dir/file1.bin'
+        ),
+        size=3623374,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file2.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}'
+            '/some_dir/file2.bin'
+        ),
+        size=2773582,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file3.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_dir/file3.bin'
+        ),
+        size=3072718,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file4.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_dir/file4.bin'
+        ),
+        size=4513102,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_dir/file5.bin',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_dir/file5.bin'
+        ),
+        size=57601005,
+    ),
+    fsync.FSyncPath(
+        path_type=fsync.PathType.file,
+        rel_path='some_script.sh',
+        abs_path=(
+            f'{tests.source_root_dir}/{tests.small_sample}/some_script.sh'
+        ),
+        size=136,
+    ),
+]
