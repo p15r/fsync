@@ -184,6 +184,10 @@ def _list_source(source_directory: Path) -> List[FSyncPath]:
                 4096
             )
         else:
+            if abs_path.stem.startswith('.'):
+                # ignore hidden files
+                continue
+
             p = FSyncPath(
                 PathType.file,
                 rel_path.as_posix(),
