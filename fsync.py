@@ -30,6 +30,7 @@ sys.setrecursionlimit(RECURSION_LIMIT)
 class Config:
     source_directory: str
     target_ip_address: str
+    target_port: int
     target_directory: str
 
 
@@ -58,7 +59,7 @@ class FSyncPath:
         return hash(self.rel_path)
 
 
-def _usage() -> Tuple[str, str, str]:
+def _usage() -> Tuple[str, str, int, str]:
     parser = argparse.ArgumentParser(
         description=(
             'Syncs local files to target (FTP server). Local is master '
@@ -79,6 +80,11 @@ def _usage() -> Tuple[str, str, str]:
         help='sync target IP address'
     )
     parser.add_argument(
+        '--target-port',
+        required=False,
+        help='sync target port'
+    )
+    parser.add_argument(
         '--target-dir',
         required=False,
         help='path to target directory'
@@ -86,7 +92,10 @@ def _usage() -> Tuple[str, str, str]:
 
     args = parser.parse_args()
 
-    return args.source_dir, args.target, args.target_dir
+    if args.target_port:
+        args.target_port = int(args.target_port)
+
+    return args.source_dir, args.target, args.target_port, args.target_dir
 
 
 def bytes_to_mbytes(b: float) -> float:
@@ -98,16 +107,15 @@ def bytes_to_mbytes(b: float) -> float:
 def _load_config() -> Config:
     with open(CONFIG_FILE, 'r') as f_handle:
         cnt = json.load(f_handle)
-
     # `**cnt` unpacks dict into list of args for dataclass
     config = Config(**cnt)
-
     return config
 
 
-def _login(target: str) -> FTP:
-    ftp_session = FTP(target)   # nosec
+def _login(target_ip_address: str, target_port: int) -> FTP:
+    ftp_session = FTP()
     ftp_session.encoding = 'utf-8'
+    ftp_session.connect(target_ip_address, target_port)
     ftp_session.login()
     ftp_session.sendcmd('OPTS UTF8 ON')
 
@@ -402,16 +410,19 @@ def _sync_add(
 
 def main() -> int:
     config = _load_config()
-    param_source_directory, param_target, param_target_directory = _usage()
+    p_source_directory, p_target, p_port, p_target_directory = _usage()
 
-    if param_source_directory:
-        config.source_directory = param_source_directory
+    if p_source_directory:
+        config.source_directory = p_source_directory
 
-    if param_target:
-        config.target_ip_address = param_target
+    if p_target:
+        config.target_ip_address = p_target
 
-    if param_target_directory:
-        config.target_directory = param_target_directory
+    if p_port:
+        config.target_port = p_port
+
+    if p_target_directory:
+        config.target_directory = p_target_directory
 
     start_sync = datetime.now()
 
@@ -424,7 +435,7 @@ def main() -> int:
         )
 
     logging.info('Authenticating...')
-    ftp_session = _login(config.target_ip_address)
+    ftp_session = _login(config.target_ip_address, config.target_port)
 
     logging.info('Getting target directory content...')
     target_paths = _list_remote(config, ftp_session)

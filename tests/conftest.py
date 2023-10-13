@@ -34,6 +34,7 @@ def get_config_empty():
     return fsync.Config(
             source_directory=f'{tests.source_root_dir}/sample_dataset_emtpy/',
             target_ip_address='192.168.1.2',
+            target_port=21,
             target_directory=f'{tests.target_root_dir}'
     )
 
@@ -46,6 +47,7 @@ def get_config_small():
                 f'{tests.source_root_dir}/{tests.small_sample}/'
             ),
             target_ip_address='192.168.1.2',
+            target_port=21,
             target_directory=f'{tests.target_root_dir}'
     )
 
