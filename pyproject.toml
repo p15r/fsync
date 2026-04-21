@@ -1,6 +1,6 @@
 [project]
 name = "fsync"
-version = "0.2.1"
+version = "0.2.2"
 description = "fsync is a script that behaves like `rsync -a` over FTP."
 readme = "README.md"
 requires-python = ">=3.8,<=3.13"
