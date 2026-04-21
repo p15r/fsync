@@ -3,7 +3,7 @@ name = "fsync"
 version = "0.1.1"
 description = "fsync is a script that behaves like `rsync -a` over FTP."
 readme = "README.md"
-requires-python = ">=3.7,<=3.13"
+requires-python = ">=3.8,<=3.13"
 
 [dependency-groups]
 dev = [
