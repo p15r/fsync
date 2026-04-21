@@ -113,7 +113,7 @@ def _load_config() -> Config:
 
 
 def _login(target_ip_address: str, target_port: int) -> FTP:
-    ftp_session = FTP()
+    ftp_session = FTP()  # nosec: B321:blacklist
     ftp_session.encoding = 'utf-8'
     ftp_session.connect(target_ip_address, target_port)
     ftp_session.login()
