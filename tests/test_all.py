@@ -181,7 +181,7 @@ def test__sync_add_small_dataset(
     add = tests.test_harness.sync_add_small_dataset
     expected_bytes_transferred = 699993.0
 
-    def mock_path_stat(*args):
+    def mock_path_stat(*args, **kwargs):
         class StatObj(object):
             st_size = 99999
             st_mode = 33060  # chmod 0444
